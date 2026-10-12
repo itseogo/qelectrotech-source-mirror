@@ -75,6 +75,8 @@ namespace QET {
 		QIcon EditDelete;
 		QIcon EditOpacity;		
 		QIcon EditPaste;
+		QIcon CopyElementTextFormat;
+		QIcon ApplyElementTextFormat;
 		QIcon EditRedo;
 		QIcon EditRename;
 		QIcon EditSelectAll;

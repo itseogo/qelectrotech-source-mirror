@@ -11806,6 +11806,41 @@ Verfügbare Optionen:
 <context>
     <name>QETDiagramEditor</name>
     <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="468"/>
+        <source>Copier le style de texte</source>
+        <translation>Beschriftungsart kopieren</translation>
+    </message>
+    <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="469"/>
+        <source>Appliquer le style de texte</source>
+        <translation>Beschriftungsart zuweisen</translation>
+    </message>
+    <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="474"/>
+        <source>Copie le format de texte de l&apos;élément sélectionné comme modèle</source>
+        <comment>status bar tip</comment>
+        <translation>Kopiert das Beschriftungsformat des ausgewählten Elements als Vorlage</translation>
+    </message>
+    <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="475"/>
+        <source>Applique le format de texte copié aux éléments sélectionnés</source>
+        <comment>status bar tip</comment>
+        <translation>Weist das kopierte Beschriftungsformat den markierten Elementen zu</translation>
+    </message>
+    <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="4720"/>
+        <source>Style de texte de « %1 » copié</source>
+        <translation>Beschriftungsart von „%1“ kopiert</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../sources/qetdiagrameditor.cpp" line="4748"/>
+        <source>Style de texte appliqué à %n élément(s)</source>
+        <translation>
+            <numerusform>Beschriftungsart auf %n Element zugewiesen</numerusform>
+            <numerusform>Beschriftungsart auf %n Elemente zugewiesen</numerusform>
+        </translation>
+    </message>
+    <message>
         <location filename="../sources/qetdiagrameditor.cpp" line="175"/>
         <location filename="../sources/qetdiagrameditor.cpp" line="3925"/>
         <location filename="../sources/qetdiagrameditor.cpp" line="3928"/>

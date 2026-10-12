@@ -1804,6 +1804,12 @@ void Element::setElementInformations(DiagramContext dc)
 		return;
 	}
 
+	bool label_changed = m_data.m_informations.value("label").toString() != dc.value("label").toString();
+
+	if (label_changed && (linkType() & Element::AllReport)) {
+		unlinkAllElements();
+	}
+
 	const auto old_info = m_data.m_informations;
 	m_data.m_informations = dc;
 
@@ -1812,6 +1818,14 @@ void Element::setElementInformations(DiagramContext dc)
 		m_data.m_informations.addValue(QStringLiteral("label"), actual_label); //Update the label if there is a formula
 	}
 	emit elementInfoChange(old_info, m_data.m_informations);
+
+	if (label_changed && (linkType() & Element::AllReport)) {
+		if (diagram() && diagram()->project()) {
+			QTimer::singleShot(0, diagram()->project(), [prj = diagram()->project()]() {
+				prj->autoLinkReportElements();
+			});
+		}
+	}
 
 	// Propagate label change to linked PLC slaves (label is changed via
 	// setElementInformations through the undo stack, not via setElementData)

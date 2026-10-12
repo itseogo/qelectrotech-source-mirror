@@ -53,6 +53,7 @@
 #include "cable/editcablecommand.h"
 #include "diagramevent/diagrameventaddpaste.h"
 #include "diagramview.h"
+#include "elementtextpattern.h"
 #include "elementspanelwidget.h"
 #include "factory/elementpicturefactory.h"
 #include "factory/qetgraphicstablefactory.h"
@@ -463,10 +464,22 @@ void QETDiagramEditor::setUpActions()
 	connect(m_paste, &QAction::triggered, [start_paste]() {
 		start_paste(DiagramEventAddPaste::UnderCursor);
 	});
+		//Format painter actions (Beschriftungsformat kopieren / zuweisen)
+	m_copy_text_format  = new QAction(QET::Icons::CopyElementTextFormat,  tr("Copier le style de texte"), this);
+	m_apply_text_format = new QAction(QET::Icons::ApplyElementTextFormat, tr("Appliquer le style de texte"), this);
+
+	ShortcutManager::instance().registerAction(m_copy_text_format, "diagrameditor.copy_text_format", tr("Éditeur de schémas"), Qt::CTRL | Qt::SHIFT | Qt::Key_C);
+	ShortcutManager::instance().registerAction(m_apply_text_format, "diagrameditor.apply_text_format", tr("Éditeur de schémas"), Qt::CTRL | Qt::SHIFT | Qt::Key_V);
+
+	m_copy_text_format  -> setStatusTip(tr("Copie le format de texte de l'élément sélectionné comme modèle", "status bar tip"));
+	m_apply_text_format -> setStatusTip(tr("Applique le format de texte copié aux éléments sélectionnés", "status bar tip"));
+
+	connect(m_copy_text_format,  &QAction::triggered, this, &QETDiagramEditor::copyTextFormat);
+	connect(m_apply_text_format, &QAction::triggered, this, &QETDiagramEditor::applyTextFormat);
 	connect(m_paste_origin, &QAction::triggered, [start_paste]() {
 		start_paste(DiagramEventAddPaste::AtOrigin);
 	});
-	connect(m_paste_element_info, &QAction::triggered,
+			connect(m_paste_element_info, &QAction::triggered,
 			this, &QETDiagramEditor::pasteElementInformations);
 
 		//Duplicate: copy the selection and place it at a configured,
@@ -1531,6 +1544,8 @@ void QETDiagramEditor::setUpMenu()
 	menu_edition -> addAction(m_cut);
 	menu_edition -> addAction(m_copy);
 	menu_edition -> addAction(m_paste);
+	menu_edition -> addAction(m_copy_text_format);
+	menu_edition -> addAction(m_apply_text_format);
 	menu_edition -> addAction(m_paste_origin);
 	menu_edition -> addAction(m_paste_element_info);
 	menu_edition -> addAction(m_duplicate);
@@ -2871,6 +2886,8 @@ void QETDiagramEditor::slot_updateComplexActions()
 	// number of selected elements
 	int selected_elements_count = dc.count(DiagramContent::Elements);
 	m_find_element->setEnabled(selected_elements_count == 1);
+	m_copy_text_format->setEnabled(selected_elements_count >= 1);
+	m_apply_text_format->setEnabled(!ro && selected_elements_count >= 1 && ElementTextFormatPattern::hasPattern());
 	m_mirror_horizontal->setEnabled(!ro && selected_elements_count);
 	m_mirror_vertical->setEnabled(!ro && selected_elements_count);
 
@@ -4689,4 +4706,57 @@ void QETDiagramEditor::updateTextGridButton()
 	}
 		//A divisor the menu does not offer, set by hand in the config file
 	m_text_grid_button->setText(tr("Texts %1").arg(TextGrid::ratioLabel(divisor)));
+}
+/**
+ * @brief QETDiagramEditor::copyTextFormat
+ * Copies the text/label layout and formatting from the currently selected element as a template.
+ */
+void QETDiagramEditor::copyTextFormat()
+{
+	DiagramView *dv = currentDiagramView();
+	if (!dv || !dv->diagram()) return;
+
+	Element *sourceElmt = nullptr;
+	for (QGraphicsItem *item : dv->diagram()->selectedItems()) {
+		if (Element *elmt = qgraphicsitem_cast<Element *>(item)) {
+			sourceElmt = elmt;
+			break;
+		}
+	}
+
+	if (!sourceElmt) return;
+
+	ElementTextFormatPattern pattern = ElementTextFormatPattern::fromElement(sourceElmt);
+	if (pattern.isValid()) {
+		ElementTextFormatPattern::setCurrentPattern(pattern);
+		slot_updateComplexActions();
+		statusBar()->showMessage(tr("Style de texte de « %1 » copié").arg(sourceElmt->name()), 3000);
+	}
+}
+
+/**
+ * @brief QETDiagramEditor::applyTextFormat
+ * Applies the stored text formatting template to all selected elements in the active diagram.
+ */
+void QETDiagramEditor::applyTextFormat()
+{
+	if (!ElementTextFormatPattern::hasPattern()) return;
+
+	DiagramView *dv = currentDiagramView();
+	if (!dv || !dv->diagram()) return;
+	if (dv->diagram()->isReadOnly()) return;
+
+	QList<Element *> targetElements;
+	for (QGraphicsItem *item : dv->diagram()->selectedItems()) {
+		if (Element *elmt = qgraphicsitem_cast<Element *>(item)) {
+			targetElements.append(elmt);
+		}
+	}
+
+	if (targetElements.isEmpty()) return;
+
+	const ElementTextFormatPattern &pattern = ElementTextFormatPattern::currentPattern();
+	dv->diagram()->undoStack().push(new ApplyElementTextFormatCommand(targetElements, pattern));
+
+	statusBar()->showMessage(tr("Style de texte appliqué à %n élément(s)", "", targetElements.size()), 3000);
 }

@@ -11799,6 +11799,41 @@ Available options:
 <context>
     <name>QETDiagramEditor</name>
     <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="468"/>
+        <source>Copier le style de texte</source>
+        <translation>Copy text format</translation>
+    </message>
+    <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="469"/>
+        <source>Appliquer le style de texte</source>
+        <translation>Apply text format</translation>
+    </message>
+    <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="474"/>
+        <source>Copie le format de texte de l&apos;élément sélectionné comme modèle</source>
+        <comment>status bar tip</comment>
+        <translation>Copies the text format of the selected element as a template</translation>
+    </message>
+    <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="475"/>
+        <source>Applique le format de texte copié aux éléments sélectionnés</source>
+        <comment>status bar tip</comment>
+        <translation>Applies the copied text format to the selected elements</translation>
+    </message>
+    <message>
+        <location filename="../sources/qetdiagrameditor.cpp" line="4720"/>
+        <source>Style de texte de « %1 » copié</source>
+        <translation>Text format of &quot;%1&quot; copied</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../sources/qetdiagrameditor.cpp" line="4748"/>
+        <source>Style de texte appliqué à %n élément(s)</source>
+        <translation>
+            <numerusform>Text format applied to %n element</numerusform>
+            <numerusform>Text format applied to %n elements</numerusform>
+        </translation>
+    </message>
+    <message>
         <location filename="../sources/qetdiagrameditor.cpp" line="1490"/>
         <source>Displ&amp;ay</source>
         <translation>Displ&amp;ay</translation>
