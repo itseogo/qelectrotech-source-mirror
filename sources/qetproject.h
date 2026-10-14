@@ -108,6 +108,8 @@ class QETProject : public QObject
 		QETProject (KAutoSaveFile *backup, QObject *parent=nullptr);
 		~QETProject() override;
 
+		void autoLinkReportElements();
+
 	private:
 		QETProject(const QETProject &);
 

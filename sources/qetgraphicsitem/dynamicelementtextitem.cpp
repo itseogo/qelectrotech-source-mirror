@@ -258,10 +258,12 @@ void DynamicElementTextItem::fromXml(const QDomElement &dom_elmt)
 
 		//Text
 	QDomElement dom_text = dom_elmt.firstChildElement("text");
-		//Clear the current text.
-	setPlainText("");
 	if (!dom_text.isNull()) {
 		setText(dom_text.text());
+		setPlainText(dom_text.text());
+	}
+	else {
+		setPlainText("");
 	}
 
 		//Info name
@@ -523,13 +525,16 @@ void DynamicElementTextItem::setInfoName(const QString &info_name)
 	{
 		if(old_info_name != info_name)
 		{
-			if(old_info_name == "label") {
+			if(old_info_name == "label" || old_info_name == "cross_ref") {
 				removeConnectionForReportFormula(m_report_formula);
 			}
-			if(info_name == "label")
+			if(info_name == "label" || info_name == "cross_ref")
 			{
+				setupFormulaConnection();
 				setConnectionForReportFormula(m_report_formula);
-				updateReportText();
+				if (m_parent_element.data()->state() != QET::GIBuildingFromXml && m_parent_element.data()->state() != QET::GILoadingFromXml) {
+					updateReportText();
+				}
 			}
 			else
 				conductorPropertiesChanged();
@@ -584,8 +589,10 @@ void DynamicElementTextItem::setCompositeText(const QString &text)
 			 */
 		if(old_composite_text.contains("%{label}"))
 			removeConnectionForReportFormula(m_report_formula);
-		if(m_composite_text.contains("%{label}"))
+		if(m_composite_text.contains("%{label}") || m_composite_text.contains("%{cross_ref}")) {
+			setupFormulaConnection();
 			setConnectionForReportFormula(m_report_formula);
+		}
 		
 		updateReportText();
 	}
@@ -1192,8 +1199,8 @@ void DynamicElementTextItem::reportChanged()
 	
 	bool text_have_label = false;
 	
-	if((textFrom() == ElementInfo && m_info_name == "label") ||
-	   (textFrom() == CompositeText && m_composite_text.contains("%{label}")))
+	if((textFrom() == ElementInfo && (m_info_name == "label" || m_info_name == "cross_ref")) ||
+	   (textFrom() == CompositeText && (m_composite_text.contains("%{label}") || m_composite_text.contains("%{cross_ref}"))))
 		text_have_label = true;
 	
 	if(text_have_label)
@@ -1221,7 +1228,7 @@ void DynamicElementTextItem::reportFormulaChanged()
 {
 	m_report_formula = parentElement()->diagram()->project()->defaultReportProperties();
 	
-	if(m_text_from == ElementInfo && m_info_name == "label")
+	if(m_text_from == ElementInfo && (m_info_name == "label" || m_info_name == "cross_ref"))
 		updateReportText();
 }
 
@@ -1350,19 +1357,59 @@ void DynamicElementTextItem::updateReportText()
 		m_parent_element.data()->linkType() != Element::ConductorDefinition)
 		return;
 	
-	if (m_text_from == ElementInfo && m_info_name == "label")
+	bool should_update = false;
+	if (m_text_from == ElementInfo)
+	{
+		if (m_info_name == "cross_ref") {
+			should_update = true;
+		} else if (m_info_name == "label") {
+			should_update = true;
+		}
+	}
+
+	if (should_update)
 	{
 		if(m_other_report)
 		{
 			Element *elmt = m_other_report.data();
-			QString label = m_report_formula;
-			label = autonum::AssignVariables::formulaToLabel(label, elmt->rSequenceStruct(), elmt->diagram(), elmt);
-			setPlainText(label);
+			QString xref_str = m_report_formula;
+			xref_str = autonum::AssignVariables::formulaToLabel(xref_str, elmt->rSequenceStruct(), elmt->diagram(), elmt);
+			
+			if (m_info_name == "label") {
+				QString lbl = m_parent_element ? m_parent_element.data()->actualLabel() : "";
+				if (!lbl.isEmpty() && !xref_str.isEmpty()) {
+					if (m_parent_element && m_parent_element.data()->linkType() == Element::PreviousReport) {
+						setPlainText(xref_str + " / " + lbl);
+					} else {
+						setPlainText(lbl + " / " + xref_str);
+					}
+				} else if (!lbl.isEmpty()) {
+					setPlainText(lbl);
+				} else {
+					setPlainText(xref_str);
+				}
+			} else {
+				setPlainText(xref_str);
+			}
 		}
 		else
 		{
-			setPlainText("");
+			if (m_info_name == "label") {
+				QString lbl = m_parent_element ? m_parent_element.data()->actualLabel() : "";
+				setPlainText(lbl);
+			} else {
+				setPlainText("");
+			}
 		}
+	}
+	else if (m_text_from == ElementInfo && m_info_name == "label")
+	{
+		// if we are label and NOT supposed to update with report text, update as normal label
+		QString lbl = elementUseForInfo() ? elementUseForInfo()->actualLabel() : "";
+		if (lbl.isEmpty() && elementUseForInfo()) {
+			lbl = elementUseForInfo()->elementInformations().value("label").toString();
+		}
+		setPlainText(lbl);
 	}
 	else if (m_text_from == CompositeText) {
 		setPlainText(reportReplacedCompositeText());
@@ -1377,8 +1424,8 @@ void DynamicElementTextItem::updateReportText()
 */
 void DynamicElementTextItem::updateLabel()
 {
-	if ((m_text_from == ElementInfo && m_info_name == "label") ||
-		(m_text_from == CompositeText && m_composite_text.contains("%{label}")))
+	if ((m_text_from == ElementInfo && (m_info_name == "label" || m_info_name == "cross_ref")) ||
+		(m_text_from == CompositeText && (m_composite_text.contains("%{label}") || m_composite_text.contains("%{cross_ref}"))))
 	{
 		DiagramContext dc;
 		Element *element = elementUseForInfo();

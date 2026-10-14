@@ -97,6 +97,8 @@ class DynamicElementTextItem : public DiagramTextItem
 		ElementTextItemGroup *parentGroup() const;
 		Element *elementUseForInfo() const;
 		void refreshLabelConnection();
+		/// Re-evaluate the text of a folio report (label / cross reference).
+		void refreshReportText() { updateReportText(); }
 
 		DynamicElementTextItem::TextFrom textFrom() const;
 		void setTextFrom (DynamicElementTextItem::TextFrom text_from);
