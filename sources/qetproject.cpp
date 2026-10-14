@@ -450,7 +450,6 @@ QETProject::ProjectState QETProject::openFile(QFile *file)
 
 		//Build the project from the xml
 	readProjectXml(xml_project);
-	autoLinkReportElements();
 
 	const qint64 total_ms = load_timer.elapsed();
 	qInfo().nospace().noquote()

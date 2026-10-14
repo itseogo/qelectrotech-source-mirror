@@ -26,6 +26,7 @@
 #include "ui/importelementtextpatterndialog.h"
 #include "undocommand/addelementtextcommand.h"
 #include "undocommand/deleteqgraphicsitemcommand.h"
+#include "shownkinds.h"
 
 #include <QDir>
 #include <QGraphicsScene>
@@ -714,6 +715,32 @@ ApplyElementTextFormatCommand::ApplyElementTextFormatCommand(
 	}
 }
 
+ApplyElementTextFormatCommand::~ApplyElementTextFormatCommand()
+{
+	for (ElementFormatChange &elChange : m_changes) {
+		Element *element = elChange.element.data();
+		for (ElementFormatChange::TextChange &tc : elChange.textChanges) {
+			if (tc.wasCreated && tc.deti) {
+				DynamicElementTextItem *deti = tc.deti.data();
+				if (!deti) continue;
+				if (deti->parentGroup()) continue;
+				if (!element || !element->dynamicTextItems().contains(deti)) {
+					delete deti;
+				}
+			}
+		}
+		for (ElementFormatChange::GroupChange &gc : elChange.groupChanges) {
+			if (gc.wasCreated && gc.group) {
+				ElementTextItemGroup *group = gc.group.data();
+				if (!group) continue;
+				if (!element || !element->textGroups().contains(group)) {
+					delete group;
+				}
+			}
+		}
+	}
+}
+
 void ApplyElementTextFormatCommand::redo()
 {
 	for (ElementFormatChange &elChange : m_changes) {
@@ -722,12 +749,17 @@ void ApplyElementTextFormatCommand::redo()
 
 		// 1. Create and update groups
 		for (ElementFormatChange::GroupChange &gc : elChange.groupChanges) {
-			ElementTextItemGroup *group = element->textGroup(gc.name);
+			ElementTextItemGroup *group = gc.group.data();
 			if (!group) {
-				group = element->addTextGroup(gc.name);
+				group = element->textGroup(gc.name);
+				if (!group) {
+					group = element->addTextGroup(gc.name);
+				}
 				gc.group = group;
 			} else {
-				gc.group = group;
+				if (!element->textGroups().contains(group)) {
+					element->addTextGroup(group);
+				}
 			}
 			if (group) {
 				group->setPos(gc.newPos);
@@ -742,12 +774,19 @@ void ApplyElementTextFormatCommand::redo()
 		// 2. Apply texts
 		for (ElementFormatChange::TextChange &tc : elChange.textChanges) {
 			DynamicElementTextItem *deti = tc.deti.data();
-			if (tc.wasCreated && !deti) {
-				deti = new DynamicElementTextItem(element);
-				deti->setTextFrom(DynamicElementTextItem::ElementInfo);
-				deti->setInfoName(tc.oldGroupName);
-				element->addDynamicTextItem(deti);
-				tc.deti = deti;
+			if (tc.wasCreated) {
+				if (!deti) {
+					deti = new DynamicElementTextItem(element);
+					deti->setTextFrom(DynamicElementTextItem::ElementInfo);
+					deti->setInfoName(tc.oldGroupName);
+					element->addDynamicTextItem(deti);
+					tc.deti = deti;
+				} else {
+					deti->setParentItem(element);
+					if (!element->dynamicTextItems().contains(deti)) {
+						element->addDynamicTextItem(deti);
+					}
+				}
 			}
 			if (!deti) continue;
 
@@ -778,7 +817,7 @@ void ApplyElementTextFormatCommand::redo()
 			deti->setRotationPointCenter(tc.newRotationPointCenter);
 			deti->setFrame(tc.newFrame);
 			deti->setTextWidth(tc.newTextWidth);
-			deti->setVisible(tc.newVisible);
+			ShownKinds::setVisible(deti, tc.newVisible);
 			deti->update();
 		}
 
@@ -805,11 +844,9 @@ void ApplyElementTextFormatCommand::undo()
 					element->removeTextFromGroup(deti, deti->parentGroup());
 				}
 				element->removeDynamicTextItem(deti);
-				if (element->scene()) {
-					element->scene()->removeItem(deti);
+				if (deti->scene()) {
+					deti->scene()->removeItem(deti);
 				}
-				delete deti;
-				tc.deti = nullptr;
 				continue;
 			}
 
@@ -840,7 +877,7 @@ void ApplyElementTextFormatCommand::undo()
 			deti->setRotationPointCenter(tc.oldRotationPointCenter);
 			deti->setFrame(tc.oldFrame);
 			deti->setTextWidth(tc.oldTextWidth);
-			deti->setVisible(tc.oldVisible);
+			ShownKinds::setVisible(deti, tc.oldVisible);
 			deti->update();
 		}
 
@@ -851,8 +888,6 @@ void ApplyElementTextFormatCommand::undo()
 
 			if (gc.wasCreated) {
 				element->removeTextGroup(group);
-				delete group;
-				gc.group = nullptr;
 				continue;
 			}
 
@@ -870,4 +905,3 @@ void ApplyElementTextFormatCommand::undo()
 		}
 	}
 }
-

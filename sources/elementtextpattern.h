@@ -144,7 +144,7 @@ class ApplyElementTextFormatCommand : public QUndoCommand
 		ApplyElementTextFormatCommand(Element *element,
 		                              const ElementTextFormatPattern &pattern,
 		                              QUndoCommand *parent = nullptr);
-		~ApplyElementTextFormatCommand() override = default;
+		~ApplyElementTextFormatCommand() override;
 
 		void undo() override;
 		void redo() override;
