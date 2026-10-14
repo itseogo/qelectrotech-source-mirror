@@ -11,7 +11,7 @@ on:
 jobs:
   build-appimage:
     name: Build Linux AppImage
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -26,9 +26,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             ca-certificates build-essential cmake ninja-build git pkg-config \
             qt6-base-dev qt6-base-private-dev qt6-tools-dev qt6-tools-dev-tools \
-            libqt6svg6-dev libqt6sql6-sqlite libcups2-dev libsqlite3-dev \
-            extra-cmake-modules libkf6coreaddons-dev libkf6widgetsaddons-dev \
-            qt6-svg-plugins libxkbcommon-x11-0 libfuse2 wget file patchelf
+            libqt6svg6-dev libsqlite3-dev libcups2-dev \
+            libxkbcommon-x11-0 wget file patchelf
 
       - name: Configure CMake
         run: |
@@ -36,6 +35,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DQT_VERSION_MAJOR=6 \
             -DCMAKE_INSTALL_PREFIX=/usr \
+            -DBUILD_WITH_KF=OFF \
             -DQET_EXPORT_PROJECT_DB=ON
 
       - name: Build QElectroTech
@@ -52,12 +52,16 @@ jobs:
 
       - name: Build AppImage
         env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
           QMAKE: /usr/lib/qt6/bin/qmake
         run: |
+          mkdir -p AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
+          cp misc/org.qelectrotech.qelectrotech.desktop AppDir/usr/share/applications/
+          cp ico/256x256/qelectrotech.png AppDir/usr/share/icons/hicolor/256x256/apps/
+          cp misc/org.qelectrotech.qelectrotech.desktop AppDir/
           cp ico/256x256/qelectrotech.png AppDir/qelectrotech.png
-          cp misc/org.qelectrotech.qelectrotech.desktop AppDir/org.qelectrotech.qelectrotech.desktop
 
-          ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
+          ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --desktop-file AppDir/org.qelectrotech.qelectrotech.desktop \
             --icon-file AppDir/qelectrotech.png \
