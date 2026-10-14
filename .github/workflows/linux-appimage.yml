@@ -1,4 +1,4 @@
-﻿name: Build Linux AppImage
+name: Build Linux AppImage
 
 on:
   workflow_dispatch:
@@ -25,8 +25,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             ca-certificates build-essential cmake ninja-build git pkg-config \
-            qt6-base-dev qt6-base-private-dev qt6-tools-dev qt6-tools-dev-tools \
-            libqt6svg6-dev libsqlite3-dev libcups2-dev \
+            qt6-base-dev qt6-base-dev-tools qt6-base-private-dev qt6-tools-dev qt6-tools-dev-tools \
+            libqt6svg6-dev qt6-svg-plugins libsqlite3-dev libcups2-dev \
             libxkbcommon-x11-0 wget file patchelf
 
       - name: Configure CMake
