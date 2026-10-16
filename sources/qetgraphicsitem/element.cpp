@@ -1807,7 +1807,9 @@ void Element::setElementInformations(DiagramContext dc)
 	bool label_changed = m_data.m_informations.value("label").toString() != dc.value("label").toString();
 
 	if (label_changed && (linkType() & Element::AllReport)) {
-		unlinkAllElements();
+		if (diagram() && diagram()->project() && diagram()->project()->chainedReports()) {
+			unlinkAllElements();
+		}
 	}
 
 	const auto old_info = m_data.m_informations;
