@@ -190,6 +190,11 @@ void ProjectMainConfigPage::applyProjectConf()
 		modified_project = true;
 	}
 
+	if (m_project -> chainedReports() != chained_reports_cb_ -> isChecked()) {
+		m_project -> setChainedReports(chained_reports_cb_ -> isChecked());
+		modified_project = true;
+	}
+
 		//Following the application's rules stores nothing in the project
 	WiringRules::Settings wiring_rules;
 	if (!use_application_rules_cb_ -> isChecked()) {
@@ -265,6 +270,9 @@ void ProjectMainConfigPage::initWidgets()
 											  "text. Uncheck to make them turn with the element, as before.",
 											  "tooltip"));
 
+	chained_reports_cb_ = new QCheckBox(tr("Enable chained folio reports for report elements", "checkbox label"));
+	chained_reports_cb_ -> setToolTip(tr("Automatically chains folio report elements with the same label in a forward/backward sequence.", "tooltip"));
+
 		//How many wires a terminal may take (discussion #1158)
 	wiring_rules_gb_ = new QGroupBox(tr("Conductors per terminal", "group box title"));
 	use_application_rules_cb_ = new QCheckBox(tr("Use the application settings", "checkbox label"));
@@ -334,6 +342,9 @@ void ProjectMainConfigPage::initLayout()
 	main_layout0 -> addWidget(upright_symbol_texts_cb_);
 	main_layout0 -> addSpacing(10);
 
+	main_layout0 -> addWidget(chained_reports_cb_);
+	main_layout0 -> addSpacing(10);
+
 	QVBoxLayout *wiring_rules_layout = new QVBoxLayout(wiring_rules_gb_);
 	wiring_rules_layout -> addWidget(use_application_rules_cb_);
 	QHBoxLayout *max_wires_layout = new QHBoxLayout();
@@ -368,6 +379,7 @@ void ProjectMainConfigPage::readValuesFromProject()
 	const int wire_hops_index = wire_hops_cb_ -> findData(WireHops::toString(m_project -> wireHops()));
 	wire_hops_cb_ -> setCurrentIndex(qMax(0, wire_hops_index));
 	upright_symbol_texts_cb_ -> setChecked(m_project -> uprightSymbolTexts());
+	chained_reports_cb_ -> setChecked(m_project -> chainedReports());
 
 		//The rules that apply: the project's own or the application's
 	const WiringRules::Settings wiring_rules = m_project -> wiringRules();
@@ -424,6 +436,7 @@ void ProjectMainConfigPage::adjustReadOnly()
 	usage_reset_pb_ -> setDisabled(is_read_only);
 	wire_hops_cb_ -> setDisabled(is_read_only);
 	upright_symbol_texts_cb_ -> setDisabled(is_read_only);
+	chained_reports_cb_ -> setDisabled(is_read_only);
 	wiring_rules_gb_ -> setDisabled(is_read_only);
 }
 

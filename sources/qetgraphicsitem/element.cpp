@@ -1820,7 +1820,7 @@ void Element::setElementInformations(DiagramContext dc)
 	emit elementInfoChange(old_info, m_data.m_informations);
 
 	if (label_changed && (linkType() & Element::AllReport)) {
-		if (diagram() && diagram()->project()) {
+		if (diagram() && diagram()->project() && diagram()->project()->chainedReports()) {
 			QTimer::singleShot(0, diagram()->project(), [prj = diagram()->project()]() {
 				prj->autoLinkReportElements();
 			});

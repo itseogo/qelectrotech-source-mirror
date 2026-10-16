@@ -365,6 +365,16 @@
         </widget>
        </item>
        <item row="7" column="0">
+        <widget class="QCheckBox" name="m_enable_chained_reports">
+         <property name="text">
+          <string>Enable chained folio reports for report elements</string>
+         </property>
+         <property name="toolTip">
+          <string>When enabled, report elements (cross-references) across folios with matching labels are automatically chained together. Newly created projects will have this enabled automatically.</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="0">
         <spacer name="verticalSpacer_2">
          <property name="orientation">
           <enum>Qt::Vertical</enum>

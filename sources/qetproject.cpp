@@ -87,6 +87,10 @@ m_project_properties_handler{this}
 		//Read auto break conductor default from global settings
 	m_auto_break_conductor = settings.value(QStringLiteral("diagrameditor/auto_break_conductor"), false).toBool();
 
+		//Read chained reports default from global settings (enabled for newly created projects when setting is on)
+	m_chained_reports = settings.value(QStringLiteral("project/enable-chained-reports"), false).toBool();
+	m_has_chained_reports_attribute = true;
+
 	int size = settings.beginReadArray(QStringLiteral("diagrameditor/defaultguides"));
 	for (int i = 0; i < size; ++i) {
 		settings.setArrayIndex(i);
@@ -1739,6 +1743,7 @@ QDomDocument QETProject::toXml()
 	writeWireHopsXml(project_root);
 	writeSymbolTextsXml(project_root);
 	writeWiringRulesXml(project_root);
+	writeChainedReportsXml(project_root);
 
 	// Properties for news diagrams
 	QDomElement new_diagrams_properties = xml_doc.createElement("newdiagrams");
@@ -2266,6 +2271,7 @@ void QETProject::readProjectXml(QDomDocument &xml_project)
 	readWireHopsXml(xml_project);
 	readSymbolTextsXml(xml_project);
 	readWiringRulesXml(xml_project);
+	readChainedReportsXml(xml_project);
 
 		//Load the default properties for the new diagrams
 	readDefaultPropertiesXml(xml_project);
@@ -2317,6 +2323,37 @@ void QETProject::readProjectXml(QDomDocument &xml_project)
 		//wire again. Run the pass once more now that the links exist:
 		//it recomputes everything from the project as it now stands.
 	CableManager::refreshLabels(this);
+
+	if (m_has_chained_reports_attribute) {
+		if (m_chained_reports) {
+			autoLinkReportElements();
+		}
+	} else {
+		// Legacy project created before this version
+		QSettings settings;
+		bool global_enabled = settings.value(QStringLiteral("project/enable-chained-reports"), false).toBool();
+		if (global_enabled && !QET::QetMessageBox::isNonInteractive()) {
+			QString proj_name = title().isEmpty() ? QFileInfo(filePath()).fileName() : title();
+			auto ret = QET::QetMessageBox::question(
+						nullptr,
+						tr("Chained Folio Reports", "message box title"),
+						tr("Project \"%1\" does not have chained folio reports enabled.\n\n"
+						   "Do you want to enable chained folio reports for this project?\n"
+						   "(Matching report elements across folios will be chained together.)",
+						   "message box content").arg(proj_name),
+						QMessageBox::Yes | QMessageBox::No,
+						QMessageBox::Yes);
+			if (ret == QMessageBox::Yes) {
+				m_chained_reports = true;
+				m_has_chained_reports_attribute = true;
+				autoLinkReportElements();
+				setModified(true);
+			} else {
+				m_chained_reports = false;
+				m_has_chained_reports_attribute = true;
+			}
+		}
+	}
 
 	m_data_base.blockSignals(false);
 	m_data_base.setUpdateBlocked(false);
@@ -2789,6 +2826,63 @@ void QETProject::writeSymbolTextsXml(QDomElement &xml_element)
 void QETProject::writeWiringRulesXml(QDomElement &xml_element)
 {
 	WiringRules::toXml(m_wiring_rules, xml_element);
+}
+
+/**
+	@brief QETProject::readChainedReportsXml
+	Read the <chained_reports> element of the project, if any.
+	A project without it was saved before this feature existed.
+	@param xml_project : the xml description of the project
+*/
+void QETProject::readChainedReportsXml(QDomDocument &xml_project)
+{
+	const QDomElement cr_elmt = xml_project.documentElement()
+			.firstChildElement(QStringLiteral("chained_reports"));
+	if (!cr_elmt.isNull()) {
+		m_has_chained_reports_attribute = true;
+		m_chained_reports = (cr_elmt.attribute(QStringLiteral("enabled"), QStringLiteral("false")) == QLatin1String("true"));
+	} else {
+		m_has_chained_reports_attribute = false;
+		m_chained_reports = false;
+	}
+}
+
+/**
+	@brief QETProject::writeChainedReportsXml
+	Save the chained reports setting into the project XML.
+	@param xml_element : the root project element
+*/
+void QETProject::writeChainedReportsXml(QDomElement &xml_element)
+{
+	if (!m_has_chained_reports_attribute && !m_chained_reports) {
+		return;
+	}
+	QDomElement cr_elmt = xml_element.ownerDocument()
+			.createElement(QStringLiteral("chained_reports"));
+	cr_elmt.setAttribute(QStringLiteral("enabled"), m_chained_reports ? QStringLiteral("true") : QStringLiteral("false"));
+	xml_element.appendChild(cr_elmt);
+}
+
+bool QETProject::chainedReports() const
+{
+	return m_chained_reports;
+}
+
+void QETProject::setChainedReports(bool enable)
+{
+	if (enable == m_chained_reports && m_has_chained_reports_attribute) {
+		return;
+	}
+	m_chained_reports = enable;
+	m_has_chained_reports_attribute = true;
+	if (m_chained_reports) {
+		autoLinkReportElements();
+	}
+}
+
+bool QETProject::hasChainedReportsAttribute() const
+{
+	return m_has_chained_reports_attribute;
 }
 
 /**
@@ -3327,6 +3421,9 @@ void QETProject::usedTitleBlockTemplateChanged(const QString &template_name) {
 
 void QETProject::autoLinkReportElements()
 {
+	if (!m_chained_reports) {
+		return;
+	}
 	QHash<QString, QList<ReportElement*>> reportsByLabel;
 	QList<ReportElement*> all_reports;
 

@@ -2185,7 +2185,7 @@ void Diagram::addItem(QGraphicsItem *item)
 		{
 			Element *elmt = static_cast<Element *>(item);
 			m_project->dataBase()->addElement(elmt);
-			if (elmt->linkType() & Element::AllReport) {
+			if ((elmt->linkType() & Element::AllReport) && m_project->chainedReports()) {
 				QTimer::singleShot(0, m_project, [prj = m_project]() {
 					prj->autoLinkReportElements();
 				});
@@ -2229,7 +2229,7 @@ void Diagram::removeItem(QGraphicsItem *item)
 			auto elmt = static_cast<Element*>(item);
 			elmt->unlinkAllElements();
 			m_project->dataBase()->removeElement(elmt);
-			if (elmt->linkType() & Element::AllReport) {
+			if ((elmt->linkType() & Element::AllReport) && m_project->chainedReports()) {
 				QTimer::singleShot(0, m_project, [prj = m_project]() {
 					prj->autoLinkReportElements();
 				});

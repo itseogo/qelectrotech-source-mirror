@@ -277,6 +277,9 @@ class QETProject : public QObject
 		void setWireHops(WireHops::Mode mode);
 		bool uprightSymbolTexts() const;
 		void setUprightSymbolTexts(bool upright);
+		bool chainedReports() const;
+		void setChainedReports(bool enable);
+		bool hasChainedReportsAttribute() const;
 		WiringRules::Settings wiringRules() const;
 		WiringRules::Settings projectWiringRules() const;
 		void setWiringRules(const WiringRules::Settings &rules);
@@ -391,6 +394,7 @@ class QETProject : public QObject
 		void readUsageXml(QDomDocument &xml_project);
 		void readWireHopsXml(QDomDocument &xml_project);
 		void readSymbolTextsXml(QDomDocument &xml_project);
+		void readChainedReportsXml(QDomDocument &xml_project);
 		void readWiringRulesXml(QDomDocument &xml_project);
 
 		void writeProjectPropertiesXml(QDomElement &);
@@ -398,6 +402,7 @@ class QETProject : public QObject
 		void writeUsageXml(QDomElement &);
 		void writeWireHopsXml(QDomElement &);
 		void writeSymbolTextsXml(QDomElement &);
+		void writeChainedReportsXml(QDomElement &);
 		void writeWiringRulesXml(QDomElement &);
 		void addDiagram(Diagram *diagram, int pos = -1);
 		void detachDiagram(Diagram *diagram);
@@ -476,6 +481,8 @@ class QETProject : public QObject
 			/// Texts drawn in a turned symbol stay horizontal (on for a new
 			/// project, off for one saved without it), see uprightSymbolTexts()
 		bool m_upright_symbol_texts = false;
+		bool m_chained_reports = false;
+		bool m_has_chained_reports_attribute = false;
 		WiringRules::Settings m_wiring_rules;
 	bool m_auto_break_conductor = false;
 		XmlElementCollection *m_elements_collection = nullptr;
