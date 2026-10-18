@@ -165,6 +165,14 @@ set(QET_SRC_FILES
   ${QET_DIR}/sources/import/edz/lzma/LzmaDec.c
   ${QET_DIR}/sources/import/edz/lzma/Ppmd7.c
   ${QET_DIR}/sources/import/edz/lzma/Ppmd7Dec.c
+  ${QET_DIR}/sources/container/miniz/miniz.c
+  ${QET_DIR}/sources/container/miniz/miniz.h
+  ${QET_DIR}/sources/container/qetcontainer.cpp
+  ${QET_DIR}/sources/container/qetcontainerdb.cpp
+  ${QET_DIR}/sources/container/qetcontainerdb.h
+  ${QET_DIR}/sources/container/qetcontainer.h
+  ${QET_DIR}/sources/container/qetzip.cpp
+  ${QET_DIR}/sources/container/qetzip.h
   ${QET_DIR}/sources/borderproperties.cpp
   ${QET_DIR}/sources/borderproperties.h
   ${QET_DIR}/sources/bordertitleblock.cpp
@@ -283,6 +291,8 @@ set(QET_SRC_FILES
   ${QET_DIR}/sources/qetmainwindow.h
   ${QET_DIR}/sources/qetmessagebox.cpp
   ${QET_DIR}/sources/qetmessagebox.h
+  ${QET_DIR}/sources/projectlock.cpp
+  ${QET_DIR}/sources/projectlock.h
   ${QET_DIR}/sources/qetproject.cpp
   ${QET_DIR}/sources/qetproject.h
   ${QET_DIR}/sources/qetregexpvalidator.cpp
@@ -701,6 +711,7 @@ set(QET_SRC_FILES
   ${QET_DIR}/sources/TerminalStrip/physicalterminal.h
   ${QET_DIR}/sources/TerminalStrip/realterminal.cpp
   ${QET_DIR}/sources/TerminalStrip/realterminal.h
+  ${QET_DIR}/sources/TerminalStrip/terminalcatalog.h
   ${QET_DIR}/sources/TerminalStrip/terminalstripbridge.cpp
   ${QET_DIR}/sources/TerminalStrip/terminalstripbridge.h
   ${QET_DIR}/sources/TerminalStrip/terminalstrip.cpp
@@ -749,6 +760,12 @@ set(QET_SRC_FILES
   ${QET_DIR}/sources/TerminalStrip/GraphicsItem/terminalstripitem.h
   ${QET_DIR}/sources/TerminalStrip/GraphicsItem/trueterminalstrip.cpp
   ${QET_DIR}/sources/TerminalStrip/GraphicsItem/trueterminalstrip.h
+  ${QET_DIR}/sources/TerminalStrip/GraphicsItem/realisticterminalstripdrawer.cpp
+  ${QET_DIR}/sources/TerminalStrip/GraphicsItem/realisticterminalstripdrawer.h
+  ${QET_DIR}/sources/TerminalStrip/GraphicsItem/terminalstripdrawerhelpers.h
+  ${QET_DIR}/sources/TerminalStrip/GraphicsItem/realisticterminalstripdrawer.cpp
+  ${QET_DIR}/sources/TerminalStrip/GraphicsItem/realisticterminalstripdrawer.h
+  ${QET_DIR}/sources/TerminalStrip/GraphicsItem/terminalstripdrawerhelpers.h
   ${QET_DIR}/sources/TerminalStrip/GraphicsItem/terminalstripdrawer.cpp
   ${QET_DIR}/sources/TerminalStrip/GraphicsItem/terminalstripdrawer.h
   ${QET_DIR}/sources/TerminalStrip/GraphicsItem/properties/terminalstriplayoutpattern.cpp
@@ -812,6 +829,8 @@ set(QET_SRC_FILES
   ${QET_DIR}/sources/ui/elementinfopartwidget.h
   ${QET_DIR}/sources/ui/elementinfowidget.cpp
   ${QET_DIR}/sources/ui/elementinfowidget.h
+  ${QET_DIR}/sources/ui/multielementinfowidget.cpp
+  ${QET_DIR}/sources/ui/multielementinfowidget.h
   ${QET_DIR}/sources/ui/terminalnumberingdialog.cpp
   ${QET_DIR}/sources/ui/terminalnumberingdialog.h
   ${QET_DIR}/sources/ui/cablenumberingdialog.cpp
@@ -932,7 +951,10 @@ set(QET_SRC_FILES
   ${QET_DIR}/sources/utils/qetsettings.cpp
   ${QET_DIR}/sources/utils/qetsettings.h
   ${QET_DIR}/sources/utils/qetutils.cpp
+  ${QET_DIR}/sources/utils/previousversions.cpp
+  ${QET_DIR}/sources/utils/previousversions.h
   ${QET_DIR}/sources/utils/qetutils.h
+  ${QET_DIR}/sources/utils/syncfolder.h
 
   ${QET_DIR}/sources/materiallist/materialentrydialog.cpp
   ${QET_DIR}/sources/materiallist/materialentrydialog.h
@@ -1099,4 +1121,5 @@ set(TS_FILES
   ${QET_DIR}/lang/qet_tr.ts
   ${QET_DIR}/lang/qet_uk.ts
   ${QET_DIR}/lang/qet_zh.ts
+  ${QET_DIR}/lang/qet_zh_TW.ts
   )

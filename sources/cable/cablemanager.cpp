@@ -340,6 +340,10 @@ void CableManager::refreshLabels(QETProject *project)
 		QString label;
 	};
 
+		//Without cables, the folios not built hold nothing this pass
+		//changes but stale references (QETProject::cableLabelFolios())
+	const QList<Diagram *> folios = project->cableLabelFolios();
+
 	QHash<QUuid, Binding> bindings;
 	for (Cable *cable : project->cables())
 	{
@@ -366,7 +370,7 @@ void CableManager::refreshLabels(QETProject *project)
 		//the core or the link does.
 	QHash<QUuid, Conductor *> conductors_by_uuid;
 	QHash<Element *, QList<Conductor *>> endings_on_report;
-	for (Diagram *diagram : project->diagrams())
+	for (Diagram *diagram : folios)
 	{
 		if (!diagram) continue;
 		for (Conductor *conductor : diagram->conductors())
@@ -445,7 +449,7 @@ void CableManager::refreshLabels(QETProject *project)
 		}
 	}
 
-	for (Diagram *diagram : project->diagrams())
+	for (Diagram *diagram : folios)
 	{
 		if (!diagram) continue;
 		for (Conductor *conductor : diagram->conductors())

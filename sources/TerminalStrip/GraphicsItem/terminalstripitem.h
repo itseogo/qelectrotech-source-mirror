@@ -54,6 +54,8 @@ class TerminalStripItem : public QetGraphicsItem
         void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event) override;
         void refreshPending();
         void setLayout(QSharedPointer<TerminalStripLayoutPattern> layout);
+		void setDrawStyle(TerminalStripLayoutPattern::DrawStyle style);
+		TerminalStripLayoutPattern::DrawStyle drawStyle() const;
 
 		/**
 		 * @brief The PdfRef struct
@@ -73,9 +75,13 @@ class TerminalStripItem : public QetGraphicsItem
 
 	private:
 		void setDefaultLayout();
+		QString xrefToolTip(const TerminalStripDrawer::hoverTerminal &terminal) const;
+		void connectStrip(TerminalStrip *strip);
+		void stripChanged();
 
 	private:
 		QPointer<TerminalStrip> m_strip;
+		QList<QMetaObject::Connection> m_strip_connections;
         TerminalStripDrawer::TerminalStripDrawer m_drawer;
         QUuid m_pending_strip_uuid;
 };

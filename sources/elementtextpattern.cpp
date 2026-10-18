@@ -336,7 +336,7 @@ ElementTextFormatPattern ElementTextFormatPattern::fromElement(Element *element)
 		tItem.rotationPointCenter = deti->rotationPointCenter();
 		tItem.frame = deti->frame();
 		tItem.textWidth = deti->textWidth();
-		tItem.visible = deti->isVisible();
+		tItem.visible = ShownKinds::wantsVisible(deti);
 		tItem.groupName = QString();
 		tItem.index = idx++;
 		tItem.isTerminalText = isTerminalTextItem(deti, element);
@@ -359,7 +359,7 @@ ElementTextFormatPattern ElementTextFormatPattern::fromElement(Element *element)
 			tItem.rotationPointCenter = deti->rotationPointCenter();
 			tItem.frame = deti->frame();
 			tItem.textWidth = deti->textWidth();
-			tItem.visible = deti->isVisible();
+			tItem.visible = ShownKinds::wantsVisible(deti);
 			tItem.groupName = group->name();
 			tItem.index = idx++;
 			tItem.isTerminalText = isTerminalTextItem(deti, element);
@@ -509,7 +509,7 @@ ApplyElementTextFormatCommand::ApplyElementTextFormatCommand(
 				tc.oldRotationPointCenter = tDeti->rotationPointCenter();
 				tc.oldFrame = tDeti->frame();
 				tc.oldTextWidth = tDeti->textWidth();
-				tc.oldVisible = tDeti->isVisible();
+				tc.oldVisible = ShownKinds::wantsVisible(tDeti);
 				tc.oldGroupName = tDeti->parentGroup() ? tDeti->parentGroup()->name() : QString();
 
 				tc.newFont = termFmt.font;
@@ -553,7 +553,7 @@ ApplyElementTextFormatCommand::ApplyElementTextFormatCommand(
 						tc.oldRotationPointCenter = tDeti->rotationPointCenter();
 						tc.oldFrame = tDeti->frame();
 						tc.oldTextWidth = tDeti->textWidth();
-						tc.oldVisible = tDeti->isVisible();
+						tc.oldVisible = ShownKinds::wantsVisible(tDeti);
 						tc.oldGroupName = tDeti->parentGroup() ? tDeti->parentGroup()->name() : QString();
 
 						tc.newFont = pItem.font;
@@ -616,7 +616,7 @@ ApplyElementTextFormatCommand::ApplyElementTextFormatCommand(
 					tc.oldRotationPointCenter = foundDeti->rotationPointCenter();
 					tc.oldFrame = foundDeti->frame();
 					tc.oldTextWidth = foundDeti->textWidth();
-					tc.oldVisible = foundDeti->isVisible();
+					tc.oldVisible = ShownKinds::wantsVisible(foundDeti);
 					tc.oldGroupName = foundDeti->parentGroup() ? foundDeti->parentGroup()->name() : QString();
 
 					tc.newFont = pItem.font;
@@ -664,7 +664,7 @@ ApplyElementTextFormatCommand::ApplyElementTextFormatCommand(
 				tc.oldRotationPointCenter = foundDeti->rotationPointCenter();
 				tc.oldFrame = foundDeti->frame();
 				tc.oldTextWidth = foundDeti->textWidth();
-				tc.oldVisible = foundDeti->isVisible();
+				tc.oldVisible = ShownKinds::wantsVisible(foundDeti);
 				tc.oldGroupName = foundDeti->parentGroup() ? foundDeti->parentGroup()->name() : QString();
 
 				tc.newFont = pItem.font;
