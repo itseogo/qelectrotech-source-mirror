@@ -210,6 +210,7 @@ class QETDiagramEditor : public QETMainWindow
 		void subWindowActivated(QMdiSubWindow *subWindows);
 		void copyTextFormat();
 		void applyTextFormat();
+		void placeSymbolTexts(Qt::Alignment where);
 
 	private slots:
 		void updateTextGridButton();
@@ -225,7 +226,8 @@ class QETDiagramEditor : public QETMainWindow
 		*m_paste_element_info,      ///< Copy the information of the copied element onto the selected elements (#1375)
 		*m_insert_last_element = nullptr, ///< Place the last placed element again
 		*m_copy_text_format = nullptr,  ///< Copy label/text formatting template
-		*m_apply_text_format = nullptr; ///< Apply label/text formatting template
+		*m_apply_text_format = nullptr, ///< Apply label/text formatting template
+		*m_place_texts = nullptr;	///< Place the texts of the selected symbols at one of nine points
 		
 		QActionGroup
 		m_row_column_actions_group, /// Action related to add/remove rows/column in diagram
@@ -264,6 +266,7 @@ class QETDiagramEditor : public QETMainWindow
 		*m_configure_duplicate,		///< Reopen the duplicate offset/direction dialog (#991)
 		*m_auto_conductor,		///< Enable/Disable the use of auto conductor
 		*m_auto_break_conductor,	///< Enable/Disable the use of auto break conductor
+		*m_crosshair,			///< Show the folio-wide crosshair
 		*m_add_cable = nullptr,		///< Draw the trunk line of a cable
 		*m_draw_grid,			///< Switch the background grid display or not
 		*m_draw_guides = nullptr,	///< Switch the custom guides display or not

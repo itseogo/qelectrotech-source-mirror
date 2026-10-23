@@ -12,7 +12,9 @@
 // when the file on disk is no longer that one. Driven through the real
 // binary's --run: qet.save(<the project's own path>) writes the file behind
 // the open project without updating what it remembers, which is exactly "someone
-// else saved"; qet.save('') is the project's own save.
+// else saved"; qet.save('') is the project's own save. Only a different content
+// counts: the same bytes with a new time are what a network share reports
+// right after our own save (#1579).
 class tst_changedondisk : public QObject
 {
 	Q_OBJECT
@@ -55,10 +57,10 @@ private slots:
 		QVERIFY(QFile::exists(QStringLiteral(QET_TEST_BINARY_PATH)));
 		const QString qet = m_dir.filePath(QStringLiteral("p.qet"));
 		QVERIFY(QFile::copy(QStringLiteral(QET_EXAMPLES_DIR "/741.qet"), qet));
-		// a .qet is saved as a .qetz beside it; that .qetz is the project below
-		const QString out = run(QStringLiteral("qet.log('R ' + qet.save(''));\n"), qet);
-		QVERIFY2(out.contains(QStringLiteral("R true")), qPrintable(out));
+		// the .qet saved as a .qetz is the project below
 		m_project = m_dir.filePath(QStringLiteral("p.qetz"));
+		const QString out = run(QStringLiteral("qet.log('R ' + qet.save('%1'));\n").arg(m_project), qet);
+		QVERIFY2(out.contains(QStringLiteral("R true")), qPrintable(out));
 		QVERIFY(QFile::exists(m_project));
 	}
 
@@ -71,9 +73,21 @@ private slots:
 		QVERIFY2(out.contains(QStringLiteral("R2 true")), qPrintable(out));
 	}
 
+	void sameContentNewTimeSaves()
+	{
+		// the same bytes written behind the project (an unchanged project
+		// saves to an identical file, F124): only the time differs
+		const QString script = QStringLiteral(
+			"qet.save(%1);\nqet.log('R ' + qet.save(''));\n")
+			.arg(QStringLiteral("'") + m_project + QStringLiteral("'"));
+		const QString out = run(script, m_project);
+		QVERIFY2(out.contains(QStringLiteral("R true")), qPrintable(out));
+	}
+
 	void changedFileIsNotOverwritten()
 	{
 		const QString script = QStringLiteral(
+			"qet.moveElement(0, qet.elementUuids(0)[0], 10, 0);\n"
 			"qet.save(%1);\nqet.log('R ' + qet.save(''));\n")
 			.arg(QStringLiteral("'") + m_project + QStringLiteral("'"));
 		const QString out = run(script, m_project);
@@ -84,6 +98,7 @@ private slots:
 	void overrideOverwrites()
 	{
 		const QString script = QStringLiteral(
+			"qet.moveElement(0, qet.elementUuids(0)[0], 10, 0);\n"
 			"qet.save(%1);\nqet.log('R ' + qet.save(''));\n")
 			.arg(QStringLiteral("'") + m_project + QStringLiteral("'"));
 		const QString out = run(script, m_project, true);

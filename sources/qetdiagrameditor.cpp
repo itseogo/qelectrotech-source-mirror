@@ -20,6 +20,7 @@
 #include "container/qetzip.h"
 #include "utils/previousversions.h"
 #include "shownkinds.h"
+#include "symboltextplacement.h"
 #ifdef QET_HAS_SCRIPTING
 #include "scripting/qetscripting.h"
 #include "scripting/scriptlibrary.h"
@@ -33,6 +34,7 @@
 #include <QCoreApplication>
 #include <QToolButton>
 #include <QWidgetAction>
+#include <QGridLayout>
 #include "ElementsCollection/elementscollectionwidget.h"
 #include "ElementsCollection/elementpickerpopup.h"
 #include "shortcutbarsettings.h"
@@ -489,6 +491,62 @@ void QETDiagramEditor::setUpActions()
 	connect(m_copy_text_format,  &QAction::triggered, this, &QETDiagramEditor::copyTextFormat);
 	connect(m_apply_text_format, &QAction::triggered, this, &QETDiagramEditor::applyTextFormat);
 
+		//The texts of the selected symbols, label and notes, as one block at
+		//one of nine points around the symbol: the nine points of the text
+		//alignment dialog. A click places them at the point chosen last.
+	const auto chosen_point = []() {
+		return Qt::Alignment(QSettings().value(QStringLiteral("diagrameditor/place_texts_point"),
+											   int(Qt::AlignLeft | Qt::AlignVCenter)).toInt());
+	};
+		//The button shows where its click will put the texts
+	m_place_texts = new QAction(SymbolTextPlacement::icon(chosen_point()), tr("Place symbol texts"), this);
+	m_place_texts->setStatusTip(tr("Place the label and the notes of the selected symbols as one block beside them", "status bar tip"));
+	ShortcutManager::instance().registerAction(m_place_texts, "diagrameditor.place_symbol_texts", tr("Diagram editors"), QKeySequence());
+	{
+		auto *menu = new QMenu(this);
+		auto *grid_widget = new QWidget(menu);
+		auto *grid = new QGridLayout(grid_widget);
+		grid->setContentsMargins(6, 6, 6, 6);
+		grid->setSpacing(2);
+		const struct { Qt::Alignment where; const char *tip; } points[] = {
+			{Qt::AlignLeft | Qt::AlignTop,        QT_TR_NOOP("Above, left")},
+			{Qt::AlignHCenter | Qt::AlignTop,     QT_TR_NOOP("Above")},
+			{Qt::AlignRight | Qt::AlignTop,       QT_TR_NOOP("Above, right")},
+			{Qt::AlignLeft | Qt::AlignVCenter,    QT_TR_NOOP("Left")},
+			{Qt::AlignCenter,                     QT_TR_NOOP("On the symbol")},
+			{Qt::AlignRight | Qt::AlignVCenter,   QT_TR_NOOP("Right")},
+			{Qt::AlignLeft | Qt::AlignBottom,     QT_TR_NOOP("Below, left")},
+			{Qt::AlignHCenter | Qt::AlignBottom,  QT_TR_NOOP("Below")},
+			{Qt::AlignRight | Qt::AlignBottom,    QT_TR_NOOP("Below, right")}};
+		int n = 0;
+		for (const auto &point : points)
+		{
+			auto *button = new QToolButton(grid_widget);
+			button->setIcon(SymbolTextPlacement::icon(point.where));
+			button->setIconSize(QSize(32, 32));
+			button->setToolTip(tr(point.tip));
+			button->setObjectName(QStringLiteral("place_texts_%1").arg(n));
+			button->setFixedSize(38, 38);
+			button->setAutoRaise(true);
+			const Qt::Alignment where = point.where;
+			connect(button, &QToolButton::clicked, this, [this, menu, where]() {
+				menu->close();
+				QSettings().setValue(QStringLiteral("diagrameditor/place_texts_point"), int(where));
+				m_place_texts->setIcon(SymbolTextPlacement::icon(where));
+				placeSymbolTexts(where);
+			});
+			grid->addWidget(button, n / 3, n % 3);
+			++n;
+		}
+		auto *grid_action = new QWidgetAction(menu);
+		grid_action->setDefaultWidget(grid_widget);
+		menu->addAction(grid_action);
+		m_place_texts->setMenu(menu);
+	}
+	connect(m_place_texts, &QAction::triggered, this, [this, chosen_point]() {
+		placeSymbolTexts(chosen_point());
+	});
+
 		//Duplicate: copy the selection and place it at a configured,
 		//grid-step offset immediately -- no interactive follow-the-
 		//cursor step, unlike Ctrl+V above. That is deliberate (#991):
@@ -588,6 +646,19 @@ void QETDiagramEditor::setUpActions()
 				d->setDisplayGrid(checked);
 				d->update();
 			}
+	});
+
+		//A crosshair across the whole folio under the mouse, to see
+		//whether symbols and terminals are in line
+	m_crosshair = new QAction(tr("Folio-wide crosshair"), this);
+	ShortcutManager::instance().registerAction(m_crosshair, "diagrameditor.crosshair", tr("Diagram editors"), QKeySequence());
+	m_crosshair->setStatusTip(tr("Show two lines across the whole folio under the mouse, to see whether parts are in line"));
+	m_crosshair->setCheckable(true);
+	m_crosshair->setChecked(DiagramView::crosshairShown());
+	connect(m_crosshair, &QAction::triggered, [this](bool checked) {
+		DiagramView::setCrosshairShown(checked);
+		for (DiagramView *view : findChildren<DiagramView *>())
+			view->viewport()->update();
 	});
 
 		//Snap step for dragged texts, as a fraction of the folio grid
@@ -1572,6 +1643,7 @@ void QETDiagramEditor::setUpMenu()
 	menu_edition -> addAction(m_paste);
 	menu_edition -> addAction(m_copy_text_format);
 	menu_edition -> addAction(m_apply_text_format);
+	menu_edition -> addAction(m_place_texts);
 	menu_edition -> addAction(m_paste_origin);
 	menu_edition -> addAction(m_paste_element_info);
 	menu_edition -> addAction(m_duplicate);
@@ -1703,6 +1775,7 @@ void QETDiagramEditor::setUpMenu()
 	menu_affichage -> addAction(m_mode_visualise);
 	menu_affichage -> addSeparator();
 	menu_affichage -> addAction(m_draw_grid);
+	menu_affichage -> addAction(m_crosshair);
 	menu_affichage -> addMenu(m_text_grid_menu);
 	menu_affichage -> addAction(m_draw_guides);
 	menu_affichage -> addAction(m_cell_rulers);
@@ -2262,27 +2335,49 @@ bool QETDiagramEditor::openAndAddProject(
 		);
 	}
 
-		//Report wires left out of the load because a terminal they join
-		//was not found: they would otherwise vanish on the next save
-		//without the user ever being told.
-	QStringList lost_wires;
+		//Report the elements and wires left out of the load: an element
+		//whose definition is missing, a wire whose terminal was not found.
+		//They are kept in the file as they were (F127, F128), but are not
+		//shown.
+	QStringList lost_elements, lost_wires;
+	for (Diagram *diagram : project->folios()) {
+		if (!diagram->isLoaded()) continue;
+		for (const QString &element : diagram->symbolsNotLoaded())
+			lost_elements << tr("Sheet %1: %2").arg(diagram->folioIndex() + 1).arg(element);
+	}
 	for (Diagram *diagram : project->foliosWithWiresNotReconnected()) {
 		for (const QString &wire : diagram->wiresNotReconnected()) {
 			lost_wires << tr("Sheet %1: %2").arg(diagram->folioIndex() + 1).arg(wire);
 		}
+	}
+	if (interactive && !lost_elements.isEmpty())
+	{
+		QMessageBox box(QMessageBox::Warning,
+						tr("Elements not loaded", "message box title"),
+						tr("%n elements could not be loaded: their definition is "
+						   "missing from the project and from the collections.\n"
+						   "\n"
+						   "They are not shown, but they are kept in the file as they "
+						   "are, with their conductors, and come back once their "
+						   "definition is available again.",
+						   "message box content",
+						   lost_elements.size()),
+						QMessageBox::Ok,
+						this);
+		box.setDetailedText(lost_elements.join(QLatin1Char('\n')));
+		box.exec();
 	}
 	if (interactive && !lost_wires.isEmpty())
 	{
 		QMessageBox box(QMessageBox::Warning,
 						tr("Conductors not loaded", "message box title"),
 						tr("%n conductors could not be joined to their terminals and "
-						   "were not loaded. The element's definition in the project "
-						   "was probably replaced by another one with different "
-						   "terminals.\n"
+						   "were not loaded. The element's definition is missing, or "
+						   "was replaced by another one with different terminals.\n"
 						   "\n"
-						   "If you save the project, these conductors will disappear "
-						   "from the file. Close it without saving to keep the file as "
-						   "it is.",
+						   "They are not shown, but they are kept in the file as they "
+						   "are, and join their terminals again once the definition "
+						   "has them where they were.",
 						   "message box content",
 						   lost_wires.size()),
 						QMessageBox::Ok,
@@ -3151,6 +3246,7 @@ void QETDiagramEditor::slot_updateComplexActions()
 	m_find_element->setEnabled(selected_elements_count == 1);
 	m_copy_text_format->setEnabled(selected_elements_count >= 1);
 	m_apply_text_format->setEnabled(!ro && selected_elements_count >= 1 && ElementTextFormatPattern::hasPattern());
+	m_place_texts->setEnabled(!ro && selected_elements_count >= 1);
 	m_mirror_horizontal->setEnabled(!ro && selected_elements_count);
 	m_mirror_vertical->setEnabled(!ro && selected_elements_count);
 
@@ -4978,6 +5074,27 @@ void QETDiagramEditor::copyTextFormat()
  * @brief QETDiagramEditor::applyTextFormat
  * Applies the stored text formatting template to all selected elements in the active diagram.
  */
+/**
+	@brief QETDiagramEditor::placeSymbolTexts
+	Place the texts of the selected symbols as one block at @a where,
+	one of nine points around each symbol, in one undo step.
+	@param where : see SymbolTextPlacement::place()
+*/
+void QETDiagramEditor::placeSymbolTexts(Qt::Alignment where)
+{
+	DiagramView *dv = currentDiagramView();
+	if (!dv || !dv->diagram() || dv->diagram()->isReadOnly()) return;
+
+	QList<Element *> elements;
+	for (QGraphicsItem *item : dv->diagram()->selectedItems())
+		if (Element *element = qgraphicsitem_cast<Element *>(item))
+			elements.append(element);
+	if (elements.isEmpty()) return;
+
+	if (QUndoCommand *undo = SymbolTextPlacement::place(elements, where))
+		dv->diagram()->undoStack().push(undo);
+}
+
 void QETDiagramEditor::applyTextFormat()
 {
 	if (!ElementTextFormatPattern::hasPattern()) return;

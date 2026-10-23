@@ -18,6 +18,7 @@
 #ifndef PROJECTDATABASE_H
 #define PROJECTDATABASE_H
 
+#include <functional>
 #include <QObject>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -33,8 +34,10 @@
 
 #include "../diagramcontext.h"
 #include "../titleblockproperties.h"
+#include "../borderproperties.h"
 #include "../conductorproperties.h"
 #include "../autoNum/assignvariables.h"
+#include "../autoNum/numerotationcontext.h"
 
 class Element;
 class QETProject;
@@ -133,6 +136,15 @@ class projectDataBase : public QObject
 			//each as "uuid: why"; empty when they all agree
 		QStringList elementInformationMismatches() const;
 
+			//The kind information of every symbol placed in the project, by
+			//symbol uuid (NO/NC/SW/power and the like, baked into the
+			//symbol's own definition, never edited after it is built): the
+			//store each symbol's kind information is written through. A
+			//symbol not placed keeps its own.
+		DiagramContext elementKindInformation(const QUuid &element) const;
+		bool storeElementKindInformation(const QUuid &element, const DiagramContext &information);
+		void forgetElementKindInformation(const QUuid &element);
+
 			//The title block properties of every folio of the project, by
 			//folio uuid: the store each folio's title block is written
 			//through. A folio not in a
@@ -145,6 +157,19 @@ class projectDataBase : public QObject
 		void folioUuidChanged(Diagram *folio, const QUuid &old_uuid);
 		QStringList folioTitleBlockMismatches() const;
 
+			//The border properties of every folio of the project, by folio
+			//uuid: the store each folio's border is written through. A
+			//folio not in a project keeps its own.
+		const BorderProperties *storedFolioBorder(const QUuid &folio) const;
+		void storeFolioBorder(const QUuid &folio, const BorderProperties &properties);
+
+			//The folio number and total folio count of every folio of the
+			//project, by folio uuid: recomputed whenever a folio is added,
+			//removed or reordered (QETProject::updateDiagramsFolioData()),
+			//the store each folio's number is written through.
+		bool storedFolioNumber(const QUuid &folio, int *index, int *total) const;
+		void storeFolioNumber(const QUuid &folio, int index, int total);
+
 			//The properties of every wire placed in the project, by wire
 			//uuid: the store each wire's properties are written through
 			//A wire not placed keeps its own.
@@ -155,6 +180,65 @@ class projectDataBase : public QObject
 		void conductorUuidChanged(Conductor *conductor, const QUuid &old_uuid);
 		QStringList conductorPropertiesMismatches() const;
 		QStringList linkRowMismatches();
+			/// A numbering scheme of the project (QETZ-DB-FIRST stage 2b)
+		struct NumberingScheme {
+			QString kind;   ///< conductor, element, folio or cable
+			QString title;
+			QUuid uuid;     ///< element schemes only
+			NumerotationContext context;
+		};
+			/// The project's numbering: its schemes of every kind and the
+			/// settings saved with them
+		struct Numbering {
+			QList<NumberingScheme> schemes;
+			QString current_conductor;
+			QString current_element;
+			QString current_cable;
+			bool freeze_new_conductors = false;
+			bool freeze_new_elements = false;
+			bool auto_break_conductors = false;
+			bool cable_x_axis_first = true;
+			bool cable_ask_numbering = true;
+		};
+		void setNumbering(const Numbering &numbering);
+		Numbering numbering() const;
+		QHash<QString, NumerotationContext> numberingSchemes(const QString &kind) const;
+		bool hasNumberingScheme(const QString &kind, const QString &title) const;
+		NumerotationContext numberingScheme(const QString &kind, const QString &title) const;
+		QUuid numberingSchemeUuid(const QString &kind, const QString &title) const;
+		QString numberingSchemeTitle(const QString &kind, const QUuid &uuid) const;
+		void setNumberingScheme(const QString &kind, const QString &title,
+								const NumerotationContext &context,
+								const QUuid &uuid = QUuid());
+		void removeNumberingScheme(const QString &kind, const QString &title);
+		void renameNumberingScheme(const QString &kind, const QString &old_title,
+								   const QString &new_title);
+		QString numberingSetting(const QString &name, const QString &default_value = QString()) const;
+		bool numberingFlag(const QString &name, bool default_value) const;
+		void setNumberingSetting(const QString &name, const QString &value);
+		void setNumberingFlag(const QString &name, bool value);
+			//2b-4: a folio's own numbering counters (unit/ten/hundred-folio
+			//sequentials), one row per (folio, owner, level, scheme, ord).
+			//owner is "element" or "conductor"; level is "unitfolio",
+			//"tenfolio" or "hundredfolio" (kept as Diagram's own strings,
+			//not renamed, so the two stay comparable in logs/greps).
+		QStringList folioCounterValues(const QUuid &folio_uuid, const QString &owner,
+										const QString &level, const QString &title) const;
+		void setFolioCounterValues(const QUuid &folio_uuid, const QString &owner,
+								   const QString &level, const QString &title,
+								   const QStringList &values);
+		void renameFolioCounterScheme(const QString &owner, const QString &old_title,
+									  const QString &new_title);
+		bool savedLinks(const Element *element, QList<std::pair<QUuid, int>> *links);
+			//The link rows are written (opening filled them): a symbol
+			//built links from them (Element::initLink())
+		bool holdsLinks() const {return m_holds_links;}
+		void forgetLinks() {m_holds_links = false;}
+		QList<std::pair<QUuid, int>> partnersToLink(const QUuid &element);
+		QList<std::pair<QUuid, int>> linkRowsOf(const QUuid &element) const;
+		QSet<QUuid> waitingPartners(const QUuid &element, const QSet<QUuid> &waiting);
+		QSet<QUuid> waitingSymbols() const;
+		QSet<QUuid> unbuiltSymbols() const;
 
 			//Fill the three stores from a project's document before its
 			//folios are built, then, once
@@ -256,8 +340,12 @@ class projectDataBase : public QObject
 		void populateConductorTable();
 		void populateLinkTable();
 		void flushLinks();
-		void insertLinkRows(QSqlQuery &insert, Element *element, const QSet<QUuid> &waiting);
-		QSet<QUuid> waitingSymbols() const;
+		void insertLinkRows(QSqlQuery &insert, Element *element, const std::function<bool(const QUuid &)> &waiting,
+							const QList<std::pair<QUuid, int>> &old_rows);
+		bool builtAlone(Element *element) const;
+		bool linksLater(const QUuid &uuid) const;
+		QList<std::pair<QUuid, int>> rowsToWrite(Element *element, const std::function<bool(const QUuid &)> &waiting,
+												 const QList<std::pair<QUuid, int>> &old_rows) const;
 		void populateDrawingItemTables();
 		bool populateFromDocument(const QDomDocument &document, QString *why = nullptr);
 		bool writeDrawingItem(QObject *object);
@@ -332,11 +420,19 @@ class projectDataBase : public QObject
 			//written: a link is made first and its contact group set after,
 			//so the rows are written when next read, as drawing items are.
 		QList<QPointer<Element>> m_dirty_link_elements;
+		QSqlQuery m_saved_links_query;
+		bool m_holds_links = false;
+			/// waitingSymbols() as it was last, for these folios not built
+			/// and this count of symbols built alone on them
+		mutable QList<Diagram *> m_waiting_folios;
+		mutable int m_waiting_alone = 0;
+		mutable QSet<QUuid> m_waiting_symbols;
 			//Elements moved since their folio cell was last written: a move
 			//sends xChanged and yChanged for every step of a drag, so the
 			//cell is written when next read, as drawing items are.
 		QList<QPointer<Element>> m_moved_elements;
 		QHash<QUuid, DiagramContext> m_element_information;
+		QHash<QUuid, DiagramContext> m_element_kind_information;
 			//The placed symbols holding each uuid: a paste or a folio copy
 			//briefly gives a copy its original's uuid, so one uuid can have
 			//two symbols until the copy's is renewed.
@@ -350,6 +446,8 @@ class projectDataBase : public QObject
 		struct UnbuiltWireEdit { ConductorProperties properties; QUuid folio; };
 		QHash<QUuid, UnbuiltWireEdit> m_unbuilt_wire_edits;
 		QHash<QUuid, TitleBlockProperties> m_folio_titleblocks;
+		QHash<QUuid, BorderProperties> m_folio_borders;
+		QHash<QUuid, QPair<int, int>> m_folio_numbers; // index, total
 		QHash<QUuid, QPointer<Diagram>> m_placed_folios;
 		QHash<QUuid, ConductorProperties> m_conductor_properties;
 			//The rows of conductor_properties, to write only what changes

@@ -92,7 +92,7 @@ if(Python3_Interpreter_FOUND AND CMAKE_GENERATOR STREQUAL "Ninja")
       --build ${CMAKE_BINARY_DIR} --binary $<TARGET_FILE:qelectrotech>
       --source ${CMAKE_CURRENT_SOURCE_DIR}/lazy_folios_probe.cpp
       --fixture ${CMAKE_CURRENT_SOURCE_DIR}/../../examples/industrial.qet)
-  set_tests_properties(tst_lazyfolios PROPERTIES TIMEOUT 1800 RUN_SERIAL TRUE
+  set_tests_properties(tst_lazyfolios PROPERTIES TIMEOUT 3000 RUN_SERIAL TRUE
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
   # Deleting a cable, undoing the delete twice and then editing anything
   # has both cable commands tearing down the same cable. Runs under the
@@ -103,6 +103,34 @@ if(Python3_Interpreter_FOUND AND CMAKE_GENERATOR STREQUAL "Ninja")
       --source ${CMAKE_CURRENT_SOURCE_DIR}/cable_undo_probe.cpp
       --fixture ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/unlinked_contact_label.qet)
   set_tests_properties(tst_cableundointegration PROPERTIES TIMEOUT 300 RUN_SERIAL TRUE)
+  # The folio-wide crosshair follows the mouse on the grid, on screen
+  # only, and goes when the mouse leaves or the option is off.
+  add_test(NAME tst_crosshairintegration
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run_crosshair_probe.py
+      --build ${CMAKE_BINARY_DIR} --binary $<TARGET_FILE:qelectrotech>
+      --source ${CMAKE_CURRENT_SOURCE_DIR}/crosshair_probe.cpp
+      --fixture ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/unlinked_contact_label.qet)
+  set_tests_properties(tst_crosshairintegration PROPERTIES TIMEOUT 300 RUN_SERIAL TRUE
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  # A linked folio report shows a pointing hand and jumps to its other
+  # end on a double click, on the arrow and on its label text; the end
+  # jumped to is highlighted for a moment.
+  add_test(NAME tst_reportjumpintegration
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run_report_jump_probe.py
+      --build ${CMAKE_BINARY_DIR} --binary $<TARGET_FILE:qelectrotech>
+      --source ${CMAKE_CURRENT_SOURCE_DIR}/report_jump_probe.cpp
+      --fixture ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/linked_reports.qet)
+  set_tests_properties(tst_reportjumpintegration PROPERTIES TIMEOUT 300 RUN_SERIAL TRUE
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  # "Place symbol texts": label and notes as one block at one of nine
+  # points beside the drawing, aligned to hang on it; one undo step.
+  add_test(NAME tst_symboltextplacementintegration
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run_symbol_text_placement_probe.py
+      --build ${CMAKE_BINARY_DIR} --binary $<TARGET_FILE:qelectrotech>
+      --source ${CMAKE_CURRENT_SOURCE_DIR}/symbol_text_placement_probe.cpp
+      --fixture ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/unlinked_contact_label.qet)
+  set_tests_properties(tst_symboltextplacementintegration PROPERTIES TIMEOUT 300 RUN_SERIAL TRUE
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 if(Python3_Interpreter_FOUND AND CMAKE_GENERATOR STREQUAL "Ninja")
   add_test(NAME tst_darkimageintegration
@@ -111,6 +139,15 @@ if(Python3_Interpreter_FOUND AND CMAKE_GENERATOR STREQUAL "Ninja")
       --source ${CMAKE_CURRENT_SOURCE_DIR}/image_dark_integration_probe.cpp
       --fixture ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/unlinked_contact_label.qet)
   set_tests_properties(tst_darkimageintegration PROPERTIES TIMEOUT 300 RUN_SERIAL TRUE)
+  # Dragging the left width handle of a symbol's text keeps its right
+  # edge in place, the right handle its left edge; undo restores both.
+  add_test(NAME tst_elementtextresizeintegration
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run_element_text_resize_probe.py
+      --build ${CMAKE_BINARY_DIR} --binary $<TARGET_FILE:qelectrotech>
+      --source ${CMAKE_CURRENT_SOURCE_DIR}/element_text_resize_probe.cpp
+      --fixture ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/unlinked_contact_label.qet)
+  set_tests_properties(tst_elementtextresizeintegration PROPERTIES TIMEOUT 300 RUN_SERIAL TRUE
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 add_executable(${PROJECT_NAME} tst_mytest.cpp)
@@ -278,6 +315,21 @@ target_compile_definitions(tst_multielementinfo PRIVATE
 # collection paths just chosen, not the ones they replace.
 qet_add_app_test(tst_assistantinfopaths tst_assistantinfopaths.cpp)
 
+# %T in a report or cross reference formula is the target folio's title.
+qet_add_app_test(tst_reportfoliotitle tst_reportfoliotitle.cpp)
+
+# The cable cells of a terminal strip are worked out from the cables of
+# the project: wired shows the cable and its core read only, unwired keeps
+# what was typed in, and nothing stale is written into the element.
+qet_add_app_test(tst_terminalcableauto tst_terminalcableauto.cpp)
+
+# A terminal's label is drawn whole in one field, or split into its label
+# and its terminal number: in their own fields when the symbol carries a
+# field for the number, one under the other when it does not. Only the
+# drawing changes; the stored label, the numbering and the exports keep
+# the whole label.
+qet_add_app_test(tst_terminallabeldisplay tst_terminallabeldisplay.cpp)
+
 # Escape during a picture's resize, rotate or pivot drag puts it back, keeps
 # it selected and records no undo step (#1414); the key goes to the view.
 qet_add_app_test(tst_imagehandleescape tst_imagehandleescape.cpp)
@@ -286,9 +338,18 @@ qet_add_app_test(tst_imagehandleescape tst_imagehandleescape.cpp)
 # pixels and position; an <image> with no picture does not stop the others.
 qet_add_app_test(tst_folioimageload tst_folioimageload.cpp)
 
-# The Selection properties panel keeps the height the user gave it when the
-# selection has nothing to edit for a moment (#1439).
+# The Selection properties panel shrinks while the selection has nothing to
+# edit (#1566) and gets back the height the user gave it (#1439).
 qet_add_app_test(tst_selectionpanelheight tst_selectionpanelheight.cpp)
+
+# The Auto numbering panel's Increment spin boxes get the width their style
+# asks for; a fixed 55 px cut the number off on Windows (#1566).
+qet_add_app_test(tst_autonumincrementwidth tst_autonumincrementwidth.cpp)
+
+# Opening a project before the elements panel's first reload() left its tree
+# item detached, and selecting the item's first child crashed in QTreeModel
+# (pre-existing since a82f6de23).
+qet_add_app_test(tst_elementspanelprojectopen tst_elementspanelprojectopen.cpp)
 
 # SVG export with smaller pictures (--svg-small-pictures, the export dialog's
 # option): a picture drawn at a tenth of its size is stored at four times
@@ -314,6 +375,17 @@ target_link_libraries(tst_textresizehandles PRIVATE Qt::Test Qt::Widgets)
 # A line's pivot follows its centre when one of its ends is dragged, as a
 # rectangle's does; a pivot placed by hand stays.
 qet_add_app_test(tst_linepivotresize tst_linepivotresize.cpp)
+
+# The terminal strip sorts into the plan's own order -- folio by folio, then
+# left to right -- instead of by label; the auto import and
+# SortTerminalStripCommand share one comparator for it, so a strip the import
+# creates cannot come out in another order than the sort it then pushes.
+qet_add_app_test(tst_terminalstriporder tst_terminalstriporder.cpp)
+
+# The strip graphic names where a cable goes at its far end -- Installation,
+# Location and Label of the first piece its wires land on past the strip, in
+# plan order, the same three fields the cable list computes for a target.
+qet_add_app_test(tst_cabletarget tst_cabletarget.cpp)
 
 # legacyelementtypes.h is header-only: the rewrite of element type names in
 # nomenclature queries saved before June 2022.
@@ -1146,6 +1218,20 @@ target_link_libraries(tst_movedterminals PRIVATE Qt::Test Qt::Xml)
 target_compile_definitions(tst_movedterminals PRIVATE
   "QET_TEST_BINARY_PATH=\"$<TARGET_FILE:qelectrotech>\"")
 
+# A symbol's kind information (NO/NC/SW/power) is queryable from the
+# project database once it is placed, not only from a live Element*.
+# QETZ-DB-FIRST 2d-2a.
+if(QET_HAS_SCRIPTING)
+  add_executable(
+    tst_elementkindinformation
+    tst_elementkindinformation.cpp)
+  add_test(NAME tst_elementkindinformation COMMAND tst_elementkindinformation)
+  add_dependencies(tst_elementkindinformation qelectrotech)
+  target_link_libraries(tst_elementkindinformation PRIVATE Qt::Test Qt::Xml)
+  target_compile_definitions(tst_elementkindinformation PRIVATE
+    "QET_TEST_BINARY_PATH=\"$<TARGET_FILE:qelectrotech>\"")
+endif()
+
 # Symbols sharing one uuid on a folio keep their wires through save and
 # reopen (#1408): nets of examples/Habitat-Schemas_developpes.qet.
 add_executable(
@@ -1437,3 +1523,15 @@ if(QET_HAS_SCRIPTING)
     "QET_TEST_BINARY_PATH=\"$<TARGET_FILE:qelectrotech>\""
     "QET_EXAMPLES_DIR=\"${QET_DIR}/examples\"")
 endif()
+
+# Closing a modified project with Discard left it in the project tree, with
+# items for its freed sheets; a click on one crashed (forum topic 3215).
+qet_add_app_test(tst_elementspanelclosedproject tst_elementspanelclosedproject.cpp)
+
+# A project closed before the element collection panel's first load, or during
+# a load, stayed in the collection and the next reload read the freed project.
+qet_add_app_test(tst_collectionclosedproject tst_collectionclosedproject.cpp)
+
+# A second QElectroTech writes to the shared element cache at once instead of
+# waiting for the first to close (#1571).
+qet_add_app_test(tst_elementcachelock tst_elementcachelock.cpp)

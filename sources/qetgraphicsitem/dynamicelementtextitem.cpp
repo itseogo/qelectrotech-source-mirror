@@ -1,4 +1,4 @@
-﻿/*
+/*
 	Copyright 2006-2026 The QElectroTech Team
 	This file is part of QElectroTech.
 	
@@ -16,6 +16,9 @@
 	along with QElectroTech.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "dynamicelementtextitem.h"
+#include <QScopedPointer>
+#include <QTextDocument>
+#include "../QetGraphicsItemModeler/textresizehandles.h"
 #include "../shownkinds.h"
 #include "../qetproject.h"
 #include "../QPropertyUndoCommand/qpropertyundocommand.h"
@@ -42,6 +45,20 @@
 #include <QMimeData>
 #include <QTextCursor>
 #include <QTextDocumentFragment>
+
+namespace {
+	/**
+		A composite text which uses the terminal number follows the label
+		as closely as one which uses %{label}: both are drawn from the
+		label of the element, and from the formula that label is made of.
+	*/
+	bool usesLabelVariables(const QString &composite_text)
+	{
+		return composite_text.contains(QLatin1String("%{label}"))
+			|| composite_text.contains(
+				QStringLiteral("%{") + QETInformation::ELMT_TERMINAL_NUMBER + QLatin1String("}"));
+	}
+}
 
 void DynamicElementTextItem::keyPressEvent(QKeyEvent *event)
 {
@@ -400,8 +417,11 @@ Element *DynamicElementTextItem::elementUseForInfo() const
 */
 void DynamicElementTextItem::refreshLabelConnection()
 {
-	if ((m_text_from == ElementInfo && m_info_name == "label") ||
-		(m_text_from == CompositeText && m_composite_text.contains("%{label}")))
+	refreshLabelShown();
+	if ((m_text_from == ElementInfo &&
+		 (m_info_name == QLatin1String("label")
+		  || m_info_name == QETInformation::ELMT_TERMINAL_NUMBER)) ||
+		(m_text_from == CompositeText && usesLabelVariables(m_composite_text)))
 	{
 		if((m_parent_element.data()->linkType() & Element::AllReport) ||
 			m_parent_element.data()->linkType() == Element::ConductorDefinition)
@@ -415,6 +435,30 @@ void DynamicElementTextItem::refreshLabelConnection()
 			updateLabel();
 		}
 	}
+}
+
+/**
+	@brief DynamicElementTextItem::refreshLabelShown
+	Whether this field is drawn at all: a field bound to the label of
+	an element whose "Show name" box is unticked (@sa Element::labelShown)
+	does not stay on the sheet as an empty frame to select -- it is
+	hidden, and comes back the moment the box is ticked again. Both ways
+	run through the same signals which refresh the text, so the field
+	can never get stuck on one side. Every other field is drawn as
+	always, and a composite text keeps drawing what is not the label.
+*/
+void DynamicElementTextItem::refreshLabelShown()
+{
+	const bool shown = !(m_text_from == ElementInfo
+						 && m_info_name == QETInformation::ELMT_LABEL)
+			|| !m_parent_element
+			|| m_parent_element.data()->labelShown();
+
+	if (!shown && isSelected()) {
+		setSelected(false);
+	}
+	setVisible(shown);
+	refreshResizeHandlesVisibility();
 }
 
 /**
@@ -449,26 +493,34 @@ void DynamicElementTextItem::setTextFrom(DynamicElementTextItem::TextFrom text_f
 	}
 	else if (m_text_from == ElementInfo && elementUseForInfo())
 	{
-		if(m_info_name == "label")
+		if(m_info_name == QLatin1String("label")
+		   || m_info_name == QETInformation::ELMT_TERMINAL_NUMBER)
 		{
 			setupFormulaConnection();
 			updateLabel();
 		}
 		else
-			setPlainText(elementUseForInfo()->elementInformations().value(m_info_name).toString());
+			setPlainText(elementUseForInfo()->infoForDisplay(m_info_name));
 		
 		if(old_text_from == UserText)
 			connect(elementUseForInfo(), &Element::elementInfoChange, this, &DynamicElementTextItem::elementInfoChanged);
 	}
 	else if (m_text_from == CompositeText && elementUseForInfo())
 	{
-		if(m_composite_text.contains("%{label}"))
+		if(usesLabelVariables(m_composite_text))
 		{
 			setupFormulaConnection();
 			updateLabel();
 		}
 		else
-			setPlainText(autonum::AssignVariables::replaceVariable(m_composite_text, elementUseForInfo()->elementInformations()));
+		{
+				//The label and the terminal number are drawn the way the
+				//settings say, every other information as it is stored
+			DiagramContext dc = elementUseForInfo()->elementInformations();
+			dc.addValue(QETInformation::ELMT_LABEL,            elementUseForInfo()->labelForDisplay());
+			dc.addValue(QETInformation::ELMT_TERMINAL_NUMBER, elementUseForInfo()->terminalNumberForDisplay());
+			setPlainText(autonum::AssignVariables::replaceVariable(m_composite_text, dc));
+		}
 		
 		if(old_text_from == UserText)
 			connect(elementUseForInfo(), &Element::elementInfoChange, this, &DynamicElementTextItem::elementInfoChanged);
@@ -477,7 +529,16 @@ void DynamicElementTextItem::setTextFrom(DynamicElementTextItem::TextFrom text_f
 	if(m_parent_element.data()->linkType() == Element::Master ||
 	   m_parent_element.data()->linkType() == Element::Slave)
 		updateXref();
-		
+
+		//A field which becomes, or stops being, the field for the
+		//terminal number changes what the label of the symbol leaves
+		//to it (@sa Element::labelForDisplay)
+	if (m_info_name == QETInformation::ELMT_TERMINAL_NUMBER
+		&& (m_text_from == ElementInfo || old_text_from == ElementInfo)
+		&& parentElement()) {
+		parentElement()->refreshLabelFields();
+	}
+
 	emit textFromChanged(m_text_from);
 }
 
@@ -514,7 +575,8 @@ void DynamicElementTextItem::setInfoName(const QString &info_name)
 	m_info_name = info_name;
 
 	
-	if(old_info_name == "label")
+	if(old_info_name == QLatin1String("label")
+	   || old_info_name == QETInformation::ELMT_TERMINAL_NUMBER)
 	{
 		clearFormulaConnection();
 		updateXref();
@@ -540,16 +602,32 @@ void DynamicElementTextItem::setInfoName(const QString &info_name)
 				conductorPropertiesChanged();
 		}
 	}
-	else if (m_info_name == "label" && elementUseForInfo())
+	else if ((m_info_name == QLatin1String("label")
+			  || m_info_name == QETInformation::ELMT_TERMINAL_NUMBER)
+			 && elementUseForInfo())
 	{	
 		setupFormulaConnection();
 		updateLabel();
 		updateXref();
 	}
 	else if(elementUseForInfo() && m_text_from == DynamicElementTextItem::ElementInfo) {
-		setPlainText(elementUseForInfo()->elementInformations().value(info_name).toString());
+		setPlainText(elementUseForInfo()->infoForDisplay(info_name));
 	}
-	
+
+		//A field which becomes, or stops being, the field for the
+		//terminal number changes what the label of the symbol leaves
+		//to it (@sa Element::labelForDisplay)
+	if (parentElement()
+		&& (info_name == QETInformation::ELMT_TERMINAL_NUMBER
+			|| old_info_name == QETInformation::ELMT_TERMINAL_NUMBER)) {
+		parentElement()->refreshLabelFields();
+	}
+
+		//A field which becomes, or stops being, the field for the
+		//label of its element is shown or hidden with the "Show name"
+		//box (@sa refreshLabelShown)
+	refreshLabelShown();
+
 	emit infoNameChanged(info_name);
 }
 
@@ -765,14 +843,11 @@ void DynamicElementTextItem::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
 	if(isSelected())
 		return;
 	
-	if ((parentElement()->linkType() & Element::AllReport) && m_other_report)
+	if (linkedElementShown())
 	{
-		if( (m_text_from == ElementInfo && m_info_name == "label") ||
-			(m_text_from == CompositeText && m_composite_text.contains("%{label}")) )
-		{
-			m_user_color = color();
-			setDefaultTextColor(Qt::blue);
-		}
+		m_user_color = color();
+		setDefaultTextColor(Qt::blue);
+		setCursor(Qt::PointingHandCursor);
 	}
 }
 
@@ -789,11 +864,16 @@ void DynamicElementTextItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 		setDefaultTextColor(m_user_color);
 		m_user_color = QColor(); //m_user_color is now invalid
 	}
-	
+		//Out of the test above: a click (mousePressEvent()) already put
+		//the colour back, and the hand would stay after it
+	unsetCursor();
 }
 
 void DynamicElementTextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
+	if (m_jump_highlight)
+		painter->fillRect(boundingRect(), QColor(69, 137, 255, 90));
+
 	DiagramTextItem::paint(painter, option, widget);
 
 	if (m_frame)
@@ -958,7 +1038,11 @@ bool DynamicElementTextItem::sceneEventFilter(QGraphicsItem *watched, QEvent *ev
 */
 void DynamicElementTextItem::refreshResizeHandlesVisibility()
 {
-	const bool handles_wanted = isSelected() || (m_parent_element && m_parent_element->isSelected());
+		//A hidden text has no handles, not even while its element is
+		//selected: refreshLabelShown() puts them back when the text
+		//is shown again
+	const bool handles_wanted = isVisible()
+			&& (isSelected() || (m_parent_element && m_parent_element->isSelected()));
 	if (handles_wanted && !m_left_resize_handle)
 		addResizeHandles();
 	else if (!handles_wanted && m_left_resize_handle)
@@ -1055,7 +1139,53 @@ void DynamicElementTextItem::handlerMousePressEvent(QetGraphicsHandlerItem *hand
 		//A concrete baseline for the live drag's delta math, which can't
 		//start from -1.
 	m_resize_baseline_width = (m_resize_original_width < 0) ? frameRect().width() : m_resize_original_width;
-	m_resize_start_local_x = mapFromScene(event->scenePos()).x();
+		//The text moves while it is dragged, to keep its alignment point
+		//in place: read the mouse in the text's coordinates as they were
+		//at the press, otherwise the delta grows with every step
+	m_resize_scene_to_local = sceneTransform().inverted();
+	m_resize_start_local_x = m_resize_scene_to_local.map(event->scenePos()).x();
+
+		//The point the text is aligned on stays where it is: remember it
+		//in the parent's coordinates, which take the text's rotation
+		//into account
+	m_resize_start_pos = pos();
+	m_resize_fixed_parent = mapToParent(resizeAnchor());
+}
+
+/**
+	@brief DynamicElementTextItem::minimumTextWidth
+	@return the narrowest width the text can be dragged to: that of its
+	widest word. Narrower, a long word runs out of the text's box while
+	the short lines are still aligned inside it, and a centred or right
+	aligned text falls apart (a lone "1" in the middle under its words).
+*/
+qreal DynamicElementTextItem::minimumTextWidth() const
+{
+	QScopedPointer<QTextDocument> narrowest(document()->clone());
+	narrowest->setTextWidth(0);
+	return qMax(narrowest->idealWidth(), qreal(10));
+}
+
+/**
+	@brief DynamicElementTextItem::resizeAnchor
+	@return the point of the text, in its own coordinates, that a drag on
+	a width handle keeps in place: the point it is aligned on, one of the
+	nine of its alignment (left, centre or right; top, middle or bottom).
+	A text aligned top right keeps its top right corner whichever handle
+	is dragged, and a text that wraps onto more lines while it narrows
+	grows away from that point instead of moving into its neighbours.
+*/
+QPointF DynamicElementTextItem::resizeAnchor() const
+{
+	const QRectF br = boundingRect();
+	const Qt::Alignment a = alignment();
+	const qreal x = (a & Qt::AlignRight) ? br.right()
+				  : (a & Qt::AlignHCenter) ? br.center().x()
+				  : br.left();
+	const qreal y = (a & Qt::AlignBottom) ? br.bottom()
+				  : (a & Qt::AlignVCenter) ? br.center().y()
+				  : br.top();
+	return QPointF(x, y);
 }
 
 /**
@@ -1070,21 +1200,26 @@ void DynamicElementTextItem::handlerMousePressEvent(QetGraphicsHandlerItem *hand
 */
 void DynamicElementTextItem::handlerMouseMoveEvent(QetGraphicsHandlerItem *handle, QGraphicsSceneMouseEvent *event)
 {
-	qreal local_x = mapFromScene(event->scenePos()).x();
+	qreal local_x = m_resize_scene_to_local.map(event->scenePos()).x();
 	qreal delta = local_x - m_resize_start_local_x;
 	if (handle == m_left_resize_handle)
 		delta = -delta;
 
-	qreal new_width = qMax(m_resize_baseline_width + delta, qreal(10));
+	qreal new_width = qMax(m_resize_baseline_width + delta, minimumTextWidth());
 	setTextWidth(new_width);
+
+		//Keep the point the text is aligned on in place, whatever the new
+		//width and number of lines
+	setPos(pos() + m_resize_fixed_parent - mapToParent(resizeAnchor()));
 	updateResizeHandlesPos();
 }
 
 /**
 	@brief DynamicElementTextItem::handlerMouseReleaseEvent
-	Push the same QPropertyUndoCommand the properties-panel width spinbox
-	already pushes (sources/ui/dynamicelementtextmodel.cpp) -- the value is
-	already applied live from the drag, so this only makes it undoable.
+	Make the drag undoable with a TextResizeCommand, as the corner handles
+	of a free text do: the width and, after a drag on the left handle, the
+	position that kept the right edge in place. Both are already applied,
+	live from the drag.
 	@param handle
 	@param event
 */
@@ -1094,10 +1229,13 @@ void DynamicElementTextItem::handlerMouseReleaseEvent(QetGraphicsHandlerItem *ha
 	Q_UNUSED(event)
 
 	qreal new_width = textWidth();
-	if (!qFuzzyCompare(m_resize_original_width, new_width) && m_parent_element && m_parent_element->diagram())
+	if ((!qFuzzyCompare(m_resize_original_width, new_width) || pos() != m_resize_start_pos)
+			&& m_parent_element && m_parent_element->diagram())
 	{
-		auto *undo = new QPropertyUndoCommand(this, "textWidth", QVariant(m_resize_original_width), QVariant(new_width));
-		undo->setAnimated(true, false);
+			//Width and position together: undoing a drag on the left
+			//handle puts the text back where it was
+		auto *undo = new TextResizeCommand(this, m_resize_original_width, new_width,
+										   m_resize_start_pos, pos());
 		undo->setText(tr("Resize an element text"));
 		m_parent_element->diagram()->undoStack().push(undo);
 	}
@@ -1105,6 +1243,11 @@ void DynamicElementTextItem::handlerMouseReleaseEvent(QetGraphicsHandlerItem *ha
 
 void DynamicElementTextItem::elementInfoChanged()
 {
+		//The "Show name" box of the selection properties was possibly
+		//ticked or unticked: the field of a hidden name leaves the
+		//sheet and comes back with the box (@sa refreshLabelShown)
+	refreshLabelShown();
+
 		//A folio report's label shows where its partner is
 		//(updateReportText()); the label in its information is only where
 		//the partner was when last saved, and changing any other
@@ -1122,6 +1265,12 @@ void DynamicElementTextItem::elementInfoChanged()
 	Element *element = elementUseForInfo();
 	if(element) {
 		dc = element->elementInformations();
+			//The label and the terminal number are drawn the way the
+			//project says (@sa QETProject::terminalLabelSplit): a
+			//composite text which uses them must see the same values the
+			//fields bound to them show
+		dc.addValue(QETInformation::ELMT_LABEL,           element->labelForDisplay());
+		dc.addValue(QETInformation::ELMT_TERMINAL_NUMBER, element->terminalNumberForDisplay());
 	}
 	
 	QString final_text;
@@ -1131,12 +1280,13 @@ void DynamicElementTextItem::elementInfoChanged()
 	{
 			//If the info is the label, then we must make some connection
 			//if the label is created from a formula
-		if(m_info_name == "label")
+		if(m_info_name == QLatin1String("label")
+		   || m_info_name == QETInformation::ELMT_TERMINAL_NUMBER)
 		{
 			setupFormulaConnection();
 
 			if (element) {
-				final_text = element->actualLabel();
+				final_text = element->infoForDisplay(m_info_name);
 			}
 		}
 		else {
@@ -1147,10 +1297,15 @@ void DynamicElementTextItem::elementInfoChanged()
 	{
 			//If the composite have the label variable, we must make some
 			//connection if the label is created from a formula
-		if (m_composite_text.contains("%{label}"))
+		if (usesLabelVariables(m_composite_text))
 			setupFormulaConnection();
 		
-		final_text = autonum::AssignVariables::replaceVariable(m_composite_text, dc);
+			//A report's %{label} is where its partner is, not its own
+			//label: the same text updateReportText() builds
+		if (m_parent_element && (m_parent_element.data()->linkType() & Element::AllReport))
+			final_text = reportReplacedCompositeText();
+		else
+			final_text = autonum::AssignVariables::replaceVariable(m_composite_text, dc);
 	}
 	else if (m_text_from  == UserText)
 		final_text = m_text;
@@ -1268,6 +1423,8 @@ void DynamicElementTextItem::setConnectionForReportFormula(const QString &formul
 		connect(other_diagram->project(), &QETProject::projectDiagramsOrderChanged, this, &DynamicElementTextItem::updateReportText);
 		connect(other_diagram->project(), &QETProject::diagramRemoved, this, &DynamicElementTextItem::updateReportText);
 	}
+	if (other_diagram && string.contains("%T"))
+		connect(&other_diagram->border_and_titleblock, &BorderTitleBlock::informationChanged, this, &DynamicElementTextItem::updateReportText);
 	if (string.contains("%l"))
 		connect(other_elmt, &Element::yChanged, this, &DynamicElementTextItem::updateReportText);
 	if (string.contains("%c"))
@@ -1293,6 +1450,8 @@ void DynamicElementTextItem::removeConnectionForReportFormula(const QString &for
 	
 	if (other_diagram && (string.contains("%f") || string.contains("%id")))
 		disconnect(other_diagram->project(), &QETProject::projectDiagramsOrderChanged, this, &DynamicElementTextItem::updateReportText);
+	if (other_diagram && string.contains("%T"))
+		disconnect(&other_diagram->border_and_titleblock, &BorderTitleBlock::informationChanged, this, &DynamicElementTextItem::updateReportText);
 	if (string.contains("%l"))
 		disconnect(other_element, &Element::yChanged, this, &DynamicElementTextItem::updateReportText);
 	if (string.contains("%c"))
@@ -1306,8 +1465,10 @@ void DynamicElementTextItem::removeConnectionForReportFormula(const QString &for
 */
 void DynamicElementTextItem::setupFormulaConnection()
 {
-	if ((m_text_from == ElementInfo && m_info_name == "label") ||
-		(m_text_from == CompositeText && m_composite_text.contains("%{label}")))
+	if ((m_text_from == ElementInfo &&
+		 (m_info_name == QLatin1String("label")
+		  || m_info_name == QETInformation::ELMT_TERMINAL_NUMBER)) ||
+		(m_text_from == CompositeText && usesLabelVariables(m_composite_text)))
 	{
 		clearFormulaConnection();
 		
@@ -1437,8 +1598,12 @@ void DynamicElementTextItem::updateReportText()
 */
 void DynamicElementTextItem::updateLabel()
 {
-	if ((m_text_from == ElementInfo && (m_info_name == "label" || m_info_name == "cross_ref")) ||
-		(m_text_from == CompositeText && (m_composite_text.contains("%{label}") || m_composite_text.contains("%{cross_ref}"))))
+	if ((m_text_from == ElementInfo &&
+		 (m_info_name == QLatin1String("label")
+		  || m_info_name == "cross_ref"
+		  || m_info_name == QETInformation::ELMT_TERMINAL_NUMBER)) ||
+		(m_text_from == CompositeText &&
+		 (usesLabelVariables(m_composite_text) || m_composite_text.contains("%{cross_ref}"))))
 	{
 		DiagramContext dc;
 		Element *element = elementUseForInfo();
@@ -1448,19 +1613,21 @@ void DynamicElementTextItem::updateLabel()
 		
 
 		if(m_text_from == ElementInfo && element) {
-			QString new_label = element->actualLabel();
+			QString new_label = element->infoForDisplay(m_info_name);
 			if (toPlainText() != new_label) {
 				setPlainText(new_label);
 			}
 		}
 		else if (m_text_from == CompositeText) {
-			// Use actualLabel() to ensure %{label} reflects the current
-			// resolved label (e.g. after a folio/page-number change).
+			// Use the label as it must be drawn, so %{label} and
+			// %{terminal_number} reflect the current resolved label (e.g.
+			// after a folio/page-number change).
 			// A contact not linked to a coil has no element to read from
 			// (bugtracker #345): %{label} then shows empty, as it did
 			// before actualLabel() was used here.
 			if (element) {
-				dc.addValue(QStringLiteral("label"), element->actualLabel());
+				dc.addValue(QETInformation::ELMT_LABEL,           element->labelForDisplay());
+				dc.addValue(QETInformation::ELMT_TERMINAL_NUMBER, element->terminalNumberForDisplay());
 			}
 			setPlainText(autonum::AssignVariables::replaceVariable(m_composite_text, dc));
 		}
@@ -1627,9 +1794,37 @@ QString DynamicElementTextItem::reportReplacedCompositeText() const
 			if(string.contains("%{conductor_section}"))
 				string.replace("%{conductor_section}", "");
 		}
+
+			//What is left is the report's own information, as in the
+			//composite text of any other element: a report can then say
+			//which device and terminal it leads to (%{comment}), the way
+			//EPLAN prints "-XS27:N 2 UG Raum - 1.1"
+		string = autonum::AssignVariables::replaceVariable(
+					string, m_parent_element.data()->elementInformations());
 	}
 	
 	return string;
+}
+
+/**
+	@brief DynamicElementTextItem::linkedElementShown
+	@return the element this text leads to: the master of a linked slave
+	or the other end of a linked folio report, when the text shows its
+	label; nullptr otherwise. Such a text turns blue under the mouse, shows
+	a pointing hand and jumps there on a double click.
+*/
+Element *DynamicElementTextItem::linkedElementShown() const
+{
+	if(!parentElement())
+		return nullptr;
+	if (!((m_text_from == ElementInfo && m_info_name == "label") ||
+		  (m_text_from == CompositeText && m_composite_text.contains("%{label}"))))
+		return nullptr;
+	if(parentElement()->linkType() == Element::Slave && m_master_element)
+		return m_master_element.data();
+	if((parentElement()->linkType() & Element::AllReport) && m_other_report)
+		return m_other_report.data();
+	return nullptr;
 }
 
 /**
@@ -1639,24 +1834,7 @@ QString DynamicElementTextItem::reportReplacedCompositeText() const
 */
 void DynamicElementTextItem::zoomToLinkedElement()
 {
-	if(!parentElement())
-		return;
-	
-	Element *zoomed_element = nullptr;
-	
-	if(parentElement()->linkType() == Element::Slave && m_master_element)
-	{
-		if ((m_text_from == ElementInfo && m_info_name == "label") ||
-			(m_text_from == CompositeText && m_composite_text.contains("%{label}")))
-			zoomed_element = m_master_element.data();
-	}
-	if((parentElement()->linkType() & Element::AllReport) && m_other_report)
-	{
-		if((m_text_from == ElementInfo && m_info_name == "label") ||
-		   (m_text_from == CompositeText && m_composite_text.contains("%{label}")))
-			zoomed_element = m_other_report.data();
-	}
-	
+	Element *zoomed_element = linkedElementShown();
 	if(zoomed_element)
 	{
 			//Unselect and ungrab mouse to prevent unwanted
@@ -1664,8 +1842,16 @@ void DynamicElementTextItem::zoomToLinkedElement()
 		setSelected(false);
 		ungrabMouse();
 
-		QetGraphicsItem::showItem(zoomed_element);
+		Element::jumpTo(zoomed_element);
 	}
+}
+
+void DynamicElementTextItem::setJumpHighlight(bool on)
+{
+	if (on == m_jump_highlight)
+		return;
+	m_jump_highlight = on;
+	update();
 }
 
 /**
