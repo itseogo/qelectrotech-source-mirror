@@ -39,6 +39,7 @@ class tst_pasteaxislock : public QObject
 	void testAxisLockAndOriginalPositionSnap();
 	void testCustomShortcut();
 	void testMenuPasteFocusAndKeyRouting();
+	void testInPlaceAxisLock();
 };
 
 void tst_pasteaxislock::testShortcutRegistration()
@@ -316,6 +317,64 @@ void tst_pasteaxislock::testMenuPasteFocusAndKeyRouting()
 	QTest::keyClick(focused, Qt::Key_Escape);
 	QCoreApplication::processEvents();
 	QVERIFY(!diagram->eventInterfaceIsRunning());
+}
+
+void tst_pasteaxislock::testInPlaceAxisLock()
+{
+	Diagram *diagram = QetAppTest::diagram();
+	QVERIFY(diagram != nullptr);
+	DiagramView *view = QetAppTest::view();
+	QVERIFY(view != nullptr);
+
+	auto *rect = new QetShapeItem(QPointF(0, 0), QPointF(40, 40), QetShapeItem::Rectangle);
+	rect->setPos(100, 100);
+	diagram->addItem(rect);
+	diagram->clearSelection();
+	rect->setSelected(true);
+
+	const QString fragment = diagram->toXml(false, true).toString(4);
+	auto *paste = new DiagramEventAddPaste(
+		diagram,
+		QPointF(300, 300),
+		DiagramEventAddPaste::InPlace,
+		fragment);
+	diagram->setEventInterface(paste);
+
+	QList<QGraphicsItem *> selected = diagram->selectedItems();
+	QVERIFY(!selected.isEmpty());
+	QGraphicsItem *pasted = nullptr;
+	for (QGraphicsItem *item : selected) {
+		if (item != rect) {
+			pasted = item;
+			break;
+		}
+	}
+	QVERIFY(pasted != nullptr);
+	QCOMPARE(pasted->pos(), QPointF(100, 100));
+
+	// Drag to (340, 360): delta = (+40, +60) -> (140, 160)
+	QGraphicsSceneMouseEvent move1(QEvent::GraphicsSceneMouseMove);
+	move1.setScenePos(QPointF(340, 360));
+	paste->mouseMoveEvent(&move1);
+	QCOMPARE(pasted->pos(), QPointF(140, 160));
+
+	// Press X: X locks to original (100), Y remains at 160
+	QKeyEvent key_x(QEvent::KeyPress, Qt::Key_X, Qt::NoModifier);
+	paste->keyPressEvent(&key_x);
+	QVERIFY(key_x.isAccepted());
+	QCOMPARE(pasted->pos(), QPointF(100, 160));
+
+	// Press Y: both locked -> snaps to original (100, 100)
+	QKeyEvent key_y(QEvent::KeyPress, Qt::Key_Y, Qt::NoModifier);
+	paste->keyPressEvent(&key_y);
+	QVERIFY(key_y.isAccepted());
+	QCOMPARE(pasted->pos(), QPointF(100, 100));
+
+	// Commit with Return -> remains at (100, 100)
+	QKeyEvent key_enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+	paste->keyPressEvent(&key_enter);
+	diagram->clearEventInterface();
+	QCOMPARE(pasted->pos(), QPointF(100, 100));
 }
 
 QET_APP_TEST_MAIN(tst_pasteaxislock)

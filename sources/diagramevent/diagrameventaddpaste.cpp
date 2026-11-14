@@ -235,6 +235,7 @@
 	}
 	if (m_placement == InPlace) {
 		m_initial_cursor = snapGrid(start_pos);
+		m_current_pos = m_initial_cursor;
 		m_baseline_captured = true;
 	}
 
@@ -362,17 +363,21 @@ void DiagramEventAddPaste::showHint()
 
 void DiagramEventAddPaste::updateEffectivePosition()
 {
+	const QPointF target = m_initial_cursor + (m_original_pos - m_group_origin);
 	QPointF effective_pos = m_current_pos;
+	QPointF visible_pos = m_group_origin + (m_current_pos - m_initial_cursor);
 	if (m_lock_x) {
-		effective_pos.setX(m_original_pos.x());
+		effective_pos.setX(target.x());
+		visible_pos.setX(m_original_pos.x());
 	}
 	if (m_lock_y) {
-		effective_pos.setY(m_original_pos.y());
+		effective_pos.setY(target.y());
+		visible_pos.setY(m_original_pos.y());
 	}
 	if ((m_lock_x || m_lock_y) && m_diagram && !m_diagram->views().isEmpty()) {
 		if (auto *view = m_diagram->views().at(0)) {
-			if (!view->viewport()->rect().contains(view->mapFromScene(effective_pos.toPoint()))) {
-				view->ensureVisible(QRectF(effective_pos, QSizeF(100, 100)), 50, 50);
+			if (!view->viewport()->rect().contains(view->mapFromScene(visible_pos.toPoint()))) {
+				view->ensureVisible(QRectF(visible_pos, QSizeF(100, 100)), 50, 50);
 			}
 		}
 	}
