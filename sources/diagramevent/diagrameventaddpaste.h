@@ -87,6 +87,7 @@ class DiagramEventAddPaste : public DiagramEventInterface
 		void mousePressEvent   (QGraphicsSceneMouseEvent *event) override;
 		void mouseReleaseEvent (QGraphicsSceneMouseEvent *event) override;
 		void keyPressEvent     (QKeyEvent *event) override;
+		bool handlesShortcutOverride(QKeyEvent *event) const override;
 		void init() override;
 
 			///@return true if the clipboard holds something this can paste.

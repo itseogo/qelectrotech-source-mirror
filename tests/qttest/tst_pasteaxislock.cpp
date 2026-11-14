@@ -40,6 +40,7 @@ class tst_pasteaxislock : public QObject
 	void testCustomShortcut();
 	void testMenuPasteFocusAndKeyRouting();
 	void testInPlaceAxisLock();
+	void testConflictingShortcutOverride();
 };
 
 void tst_pasteaxislock::testShortcutRegistration()
@@ -375,6 +376,60 @@ void tst_pasteaxislock::testInPlaceAxisLock()
 	paste->keyPressEvent(&key_enter);
 	diagram->clearEventInterface();
 	QCOMPARE(pasted->pos(), QPointF(100, 100));
+}
+
+void tst_pasteaxislock::testConflictingShortcutOverride()
+{
+	QETDiagramEditor *editor = QetAppTest::editor();
+	QVERIFY(editor != nullptr);
+	Diagram *diagram = QetAppTest::diagram();
+	QVERIFY(diagram != nullptr);
+	DiagramView *view = QetAppTest::view();
+	QVERIFY(view != nullptr);
+
+	editor->show();
+	QVERIFY(QTest::qWaitForWindowExposed(editor));
+
+	auto *rect = new QetShapeItem(QPointF(0, 0), QPointF(40, 40), QetShapeItem::Rectangle);
+	rect->setPos(100, 100);
+	diagram->addItem(rect);
+	diagram->clearSelection();
+	rect->setSelected(true);
+	view->copy();
+
+	// Rebind lock X to 'M', which collides with a global QAction in QETDiagramEditor
+	ShortcutManager::instance().setSequence(
+		QStringLiteral("diagrameditor.paste_lock_x"), QKeySequence(Qt::Key_M));
+
+	QAction *paste_action = ShortcutManager::instance().action(QStringLiteral("diagrameditor.paste"), editor);
+	QVERIFY(paste_action != nullptr);
+	paste_action->trigger();
+	QVERIFY(diagram->eventInterfaceIsRunning());
+
+	QList<QGraphicsItem *> selected = diagram->selectedItems();
+	QVERIFY(!selected.isEmpty());
+	QGraphicsItem *pasted = nullptr;
+	for (QGraphicsItem *item : selected) {
+		if (item != rect) {
+			pasted = item;
+			break;
+		}
+	}
+	QVERIFY(pasted != nullptr);
+
+	// Pressing M while paste placement is active must override the global shortcut
+	// and toggle the X axis lock instead
+	QWidget *focused = QApplication::focusWidget();
+	QVERIFY(focused != nullptr);
+	QTest::keyClick(focused, Qt::Key_M);
+	QVERIFY(diagram->eventInterfaceIsRunning());
+	QCOMPARE(pasted->pos().x(), 100.0);
+
+	QTest::keyClick(focused, Qt::Key_Escape);
+	QCoreApplication::processEvents();
+	QVERIFY(!diagram->eventInterfaceIsRunning());
+
+	ShortcutManager::instance().resetToDefault(QStringLiteral("diagrameditor.paste_lock_x"));
 }
 
 QET_APP_TEST_MAIN(tst_pasteaxislock)

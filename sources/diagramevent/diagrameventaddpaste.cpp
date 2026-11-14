@@ -559,6 +559,13 @@ void DiagramEventAddPaste::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 	}
 }
 
+bool DiagramEventAddPaste::handlesShortcutOverride(QKeyEvent *event) const
+{
+	return m_running && (
+		matchesShortcut(event, QStringLiteral("diagrameditor.paste_lock_x"))
+		|| matchesShortcut(event, QStringLiteral("diagrameditor.paste_lock_y")));
+}
+
 void DiagramEventAddPaste::keyPressEvent(QKeyEvent *event)
 {
 	if (!m_running) return;
