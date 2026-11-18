@@ -615,6 +615,7 @@ qet_add_app_test(tst_junctiondot tst_junctiondot.cpp)
 qet_add_app_test(tst_reopenprojects tst_reopenprojects.cpp)
 target_compile_definitions(tst_reopenprojects PRIVATE
   QET_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/folio_freeze_flags.qet")
+qet_add_app_test(tst_newwindowaction tst_newwindowaction.cpp)
 
 # Space on a picture turns its own transform, which the file saves (#1413),
 # alone and with a group.

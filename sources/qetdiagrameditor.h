@@ -368,6 +368,7 @@ class QETDiagramEditor : public QETMainWindow
 		*m_group_selected_texts = nullptr,
 		*m_group_selection = nullptr,   ///< Group the selected items (#1070)
 		*m_ungroup_selection = nullptr, ///< Ungroup the selected groups
+		*m_new_window = nullptr,		///< Open a new diagram editor window
 		*m_close_file,			///< Close current project file
 		*m_save_file,			///< Save current project
 		*m_save_file_as,		///< Save current project as a specific file

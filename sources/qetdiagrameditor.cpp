@@ -1605,6 +1605,7 @@ void QETDiagramEditor::setUpActions()
 		//Files action
 	QAction *new_file  = m_file_actions_group.addAction(QET::Icons::ProjectNew,     tr("&New"));
 	QAction *new_auto_file = m_file_actions_group.addAction(QET::Icons::ProjectNew, tr("New project with automatic connections"));
+	m_new_window       = m_file_actions_group.addAction(QET::Icons::WindowNew,      tr("New &window"));
 	QAction *open_file = m_file_actions_group.addAction(QET::Icons::DocumentOpen,   tr("&Open"));
 	m_save_file        = m_file_actions_group.addAction(QET::Icons::DocumentSave,   tr("&Save"));
 	m_save_file_as     = m_file_actions_group.addAction(QET::Icons::DocumentSaveAs, tr("Save as"));
@@ -1614,6 +1615,7 @@ void QETDiagramEditor::setUpActions()
 
 	ShortcutManager::instance().registerAction(new_file, "diagrameditor.new_file", tr("Diagram editors"), QKeySequence::New);
 	ShortcutManager::instance().registerAction(new_auto_file, "diagrameditor.new_auto_connect_file", tr("Diagram editors"), QKeySequence());
+	ShortcutManager::instance().registerAction(m_new_window, "diagrameditor.new_window", tr("Diagram editors"), Qt::CTRL | Qt::SHIFT | Qt::Key_N);
 	ShortcutManager::instance().registerAction(open_file, "diagrameditor.open_file", tr("Diagram editors"), QKeySequence::Open);
 	ShortcutManager::instance().registerAction(m_close_file, "diagrameditor.close_file", tr("Diagram editors"), QKeySequence::Close);
 	ShortcutManager::instance().registerAction(m_save_file, "diagrameditor.save_file", tr("Diagram editors"), QKeySequence::Save);
@@ -1622,6 +1624,7 @@ void QETDiagramEditor::setUpActions()
 	new_file     ->setStatusTip( tr("Creates a new project", "status bar tip") );
 	new_auto_file->setStatusTip( tr("Creates a new project in which terminals in line connect by themselves; "
 									"a project is of one kind or the other for good", "status bar tip") );
+	m_new_window ->setStatusTip( tr("Opens a new diagram editor window", "status bar tip") );
 	open_file    ->setStatusTip( tr("Opens an existing project", "status bar tip") );
 	m_close_file ->setStatusTip( tr("Closes the current project", "status bar tip") );
 	m_save_file    ->setStatusTip( tr("Saves the current project and all its sheets", "status bar tip") );
@@ -1644,6 +1647,7 @@ void QETDiagramEditor::setUpActions()
 	connect(m_save_file,    &QAction::triggered, this, &QETDiagramEditor::save);
 	connect(new_file,       &QAction::triggered, this, &QETDiagramEditor::newProject);
 	connect(new_auto_file,  &QAction::triggered, this, &QETDiagramEditor::newAutoConnectProject);
+	connect(m_new_window,   &QAction::triggered, QETApp::instance(), &QETApp::newDiagramEditor);
 	connect(open_file,      &QAction::triggered, this, &QETDiagramEditor::openProject);
 	connect(m_close_file,   &QAction::triggered, [this]() {
 		if (ProjectView *project_view = currentProjectView()) {
@@ -4681,6 +4685,10 @@ void QETDiagramEditor::slot_updateWindowsMenu()
 	foreach(QAction *a, windows_menu -> actions()) windows_menu -> removeAction(a);
 
 	// actions de fermeture
+	if (m_new_window) {
+		windows_menu -> addAction(m_new_window);
+		windows_menu -> addSeparator();
+	}
 	windows_menu -> addAction(m_close_file);
 	//windows_menu -> addAction(closeAllAct);
 
