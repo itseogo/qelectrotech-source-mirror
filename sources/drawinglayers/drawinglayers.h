@@ -147,6 +147,11 @@ namespace DrawingLayers
 	bool isHidden(const QGraphicsItem* item);
 	void apply(QGraphicsItem* item, const Set& set);
 	void applyTo(Diagram* folio, const Set& set);
+
+	QString exportToCsv(const Set &set);
+	bool importFromCsv(Set &set, const QString &csv_content, int *imported_count = nullptr);
+	QByteArray exportToXml(const Set &set);
+	bool importFromXml(Set &set, const QByteArray &xml_content, int *imported_count = nullptr);
 } // namespace DrawingLayers
 
 #endif // DRAWINGLAYERS_H

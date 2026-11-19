@@ -25,6 +25,7 @@
 #include "qetgraphicsitem/independenttextitem.h"
 #include "qetgraphicsitem/qetshapeitem.h"
 #include "qetgraphicsitem/structureboxitem.h"
+#include "qetmessagebox.h"
 #include "qetproject.h"
 #include "qetresult.h"
 #include "shownkinds.h"
@@ -84,6 +85,7 @@ class tst_drawinglayers : public QObject
 	{
 		QVERIFY(m_dir.isValid());
 		QETProject::setBackupEnabled(false);
+		QET::QetMessageBox::setNonInteractive(true);
 	}
 
 	void setsReadBackAndGroupsShow()
@@ -346,19 +348,19 @@ class tst_drawinglayers : public QObject
 		folio->addItem(cond_text);
 		QVERIFY(cond_text->isVisible());
 
-		auto *sym_text = new QGraphicsTextItem(QStringLiteral("K1"));
+		auto* sym_text = new QGraphicsTextItem(QStringLiteral("K1"));
 		ShownKinds::tag(sym_text, ShownKinds::SymbolTexts);
 		folio->addItem(sym_text);
 		QVERIFY(sym_text->isVisible());
 
-		auto *xref = new QGraphicsTextItem(QStringLiteral("/2.3"));
+		auto* xref = new QGraphicsTextItem(QStringLiteral("/2.3"));
 		ShownKinds::tag(xref, ShownKinds::CrossReferences);
 		folio->addItem(xref);
 		QVERIFY(xref->isVisible());
 
 		// Turn off wire numbers
 		DrawingLayers::Set set = project.drawingLayers();
-		const QString wire_name =
+		const QString	   wire_name =
 			DrawingLayers::fixedKindName(DrawingLayers::FixedKind::WireNumbers);
 		for (auto& layer : set.layers)
 		{
@@ -382,8 +384,8 @@ class tst_drawinglayers : public QObject
 		QVERIFY(! folio->useBorder());
 
 		// Turn off symbol texts
-		const QString sym_name = DrawingLayers::fixedKindName(
-			DrawingLayers::FixedKind::SymbolTexts);
+		const QString sym_name =
+			DrawingLayers::fixedKindName(DrawingLayers::FixedKind::SymbolTexts);
 		for (auto& layer : set.layers)
 		{
 			if (layer.name == sym_name) layer.visible = false;
@@ -453,58 +455,71 @@ class tst_drawinglayers : public QObject
 	void layerDescriptionPrintableAndLocked()
 	{
 		QETProject project;
-		Diagram *folio = project.addNewDiagram();
-		auto *shape = line(folio, QStringLiteral("Background"));
+		Diagram*   folio = project.addNewDiagram();
+		auto*	   shape = line(folio, QStringLiteral("Background"));
 
-		DrawingLayers::Set set = project.drawingLayers();
+		DrawingLayers::Set	 set = project.drawingLayers();
 		DrawingLayers::Layer bg;
-		bg.name = QStringLiteral("Background");
+		bg.name		   = QStringLiteral("Background");
 		bg.description = QStringLiteral("DXF background floor plan");
-		bg.visible = true;
-		bg.printable = false;
-		bg.locked = true;
+		bg.visible	   = true;
+		bg.printable   = false;
+		bg.locked	   = true;
 		set.layers.append(bg);
 		project.setDrawingLayers(set);
 
 		QVERIFY(project.drawingLayers().contains(QStringLiteral("Background")));
-		QCOMPARE(project.drawingLayers().description(QStringLiteral("Background")), QStringLiteral("DXF background floor plan"));
-		QVERIFY(project.drawingLayers().isVisible(QStringLiteral("Background")));
-		QVERIFY(!project.drawingLayers().isPrintable(QStringLiteral("Background")));
+		QCOMPARE(
+			project.drawingLayers().description(QStringLiteral("Background")),
+			QStringLiteral("DXF background floor plan"));
+		QVERIFY(
+			project.drawingLayers().isVisible(QStringLiteral("Background")));
+		QVERIFY(! project.drawingLayers().isPrintable(
+			QStringLiteral("Background")));
 		QVERIFY(project.drawingLayers().isLocked(QStringLiteral("Background")));
 
-		// On screen: visible, but not selectable or movable because it is locked
+		// On screen: visible, but not selectable or movable because it is
+		// locked
 		QVERIFY(shape->isVisible());
-		QVERIFY(!(shape->flags() & QGraphicsItem::ItemIsMovable));
-		QVERIFY(!(shape->flags() & QGraphicsItem::ItemIsSelectable));
+		QVERIFY(! (shape->flags() & QGraphicsItem::ItemIsMovable));
+		QVERIFY(! (shape->flags() & QGraphicsItem::ItemIsSelectable));
 
 		// forPrinting: automatically hidden because printable == false
-		const DrawingLayers::Set print_set = project.drawingLayers().forPrinting();
-		QVERIFY(!print_set.isVisible(QStringLiteral("Background")));
+		const DrawingLayers::Set print_set =
+			project.drawingLayers().forPrinting();
+		QVERIFY(! print_set.isVisible(QStringLiteral("Background")));
 
 		// Unlock layer
 		LayersDialog dialog(&project);
 		dialog.setLayerLocked(QStringLiteral("Background"), false);
-		QVERIFY(!project.drawingLayers().isLocked(QStringLiteral("Background")));
+		QVERIFY(
+			! project.drawingLayers().isLocked(QStringLiteral("Background")));
 		QVERIFY(shape->flags() & QGraphicsItem::ItemIsMovable);
 		QVERIFY(shape->flags() & QGraphicsItem::ItemIsSelectable);
 
 		// XML round trip preserves description, printable, and locked
 		dialog.setLayerLocked(QStringLiteral("Background"), true);
-		QDomDocument doc;
-		const DrawingLayers::Set read = DrawingLayers::Set::fromXml(project.drawingLayers().toXml(doc));
-		QCOMPARE(read.description(QStringLiteral("Background")), QStringLiteral("DXF background floor plan"));
-		QVERIFY(!read.isPrintable(QStringLiteral("Background")));
+		QDomDocument			 doc;
+		const DrawingLayers::Set read =
+			DrawingLayers::Set::fromXml(project.drawingLayers().toXml(doc));
+		QCOMPARE(
+			read.description(QStringLiteral("Background")),
+			QStringLiteral("DXF background floor plan"));
+		QVERIFY(! read.isPrintable(QStringLiteral("Background")));
 		QVERIFY(read.isLocked(QStringLiteral("Background")));
 	}
 
 	void filterLayersInDialog()
 	{
-		QETProject project;
+		QETProject	 project;
 		LayersDialog dialog(&project);
-		auto *table = dialog.findChild<QTableWidget *>(QStringLiteral("layersTable"));
+		auto*		 table =
+			dialog.findChild<QTableWidget*>(QStringLiteral("layersTable"));
 		QVERIFY(table);
 
-		dialog.addLayer(QStringLiteral("Mechanics"), QStringLiteral("3D layout"));
+		dialog.addLayer(
+			QStringLiteral("Mechanics"),
+			QStringLiteral("3D layout"));
 		dialog.addLayer(QStringLiteral("Electronics"), QStringLiteral("PCBs"));
 
 		// 4 fixed layers + 2 added = 6 rows
@@ -512,31 +527,114 @@ class tst_drawinglayers : public QObject
 
 		// Filter by "mechanic" -> only Mechanics should be visible
 		dialog.filterLayers(QStringLiteral("mechanic"));
-		for (int row = 0 ; row < table->rowCount() ; ++row) {
+		for (int row = 0; row < table->rowCount(); ++row)
+		{
 			const QString name = table->item(row, 0)->text();
-			if (name == QLatin1String("Mechanics")) {
-				QVERIFY(!table->isRowHidden(row));
-			} else {
+			if (name == QLatin1String("Mechanics"))
+			{
+				QVERIFY(! table->isRowHidden(row));
+			}
+			else
+			{
 				QVERIFY(table->isRowHidden(row));
 			}
 		}
 
 		// Filter by description "PCBs" -> only Electronics should be visible
 		dialog.filterLayers(QStringLiteral("PCBs"));
-		for (int row = 0 ; row < table->rowCount() ; ++row) {
+		for (int row = 0; row < table->rowCount(); ++row)
+		{
 			const QString name = table->item(row, 0)->text();
-			if (name == QLatin1String("Electronics")) {
-				QVERIFY(!table->isRowHidden(row));
-			} else {
+			if (name == QLatin1String("Electronics"))
+			{
+				QVERIFY(! table->isRowHidden(row));
+			}
+			else
+			{
 				QVERIFY(table->isRowHidden(row));
 			}
 		}
 
 		// Clear filter -> all rows visible
 		dialog.filterLayers(QString());
-		for (int row = 0 ; row < table->rowCount() ; ++row) {
-			QVERIFY(!table->isRowHidden(row));
+		for (int row = 0; row < table->rowCount(); ++row)
+		{
+			QVERIFY(! table->isRowHidden(row));
 		}
+	}
+
+	void importAndExportCsvAndXml()
+	{
+		// 1. Export Set to CSV
+		DrawingLayers::Set orig;
+		orig.layers.append({QStringLiteral("Notes"), QStringLiteral("Customer notes"), true, false, true});
+		const QString csv = DrawingLayers::exportToCsv(orig);
+		QVERIFY(csv.contains(QStringLiteral("Name,Description,Visible,Printable,Locked")));
+		QVERIFY(csv.contains(QStringLiteral("Notes,Customer notes,true,false,true")));
+
+		// 2. Import standard CSV
+		DrawingLayers::Set imported_csv_set;
+		int count = 0;
+		QVERIFY(DrawingLayers::importFromCsv(imported_csv_set, csv, &count));
+		QCOMPARE(count, 5); // 4 fixed system layers + 1 user layer
+		QVERIFY(imported_csv_set.contains(QStringLiteral("Notes")));
+		QCOMPARE(imported_csv_set.description(QStringLiteral("Notes")), QStringLiteral("Customer notes"));
+		QVERIFY(imported_csv_set.isVisible(QStringLiteral("Notes")));
+		QVERIFY(! imported_csv_set.isPrintable(QStringLiteral("Notes")));
+		QVERIFY(imported_csv_set.isLocked(QStringLiteral("Notes")));
+
+		// 3. Import TSV table with German headers and CAD bracket booleans ([v] / [ ])
+		const QString tsv_data = QStringLiteral(
+			"Ebene\tBeschreibung\tSichtbar\tDrucken\tGesperrt\n"
+			"100_Grafik\tAllgemeine Grafik\t[v]\t[v]\t[ ]\n"
+			"109_Kommentar\tInterne Notizen\t[v]\t[ ]\t[v]\n"
+		);
+		DrawingLayers::Set tsv_set;
+		QVERIFY(DrawingLayers::importFromCsv(tsv_set, tsv_data, &count));
+		QCOMPARE(count, 2);
+		QVERIFY(tsv_set.contains(QStringLiteral("100_Grafik")));
+		QCOMPARE(tsv_set.description(QStringLiteral("100_Grafik")), QStringLiteral("Allgemeine Grafik"));
+		QVERIFY(tsv_set.isVisible(QStringLiteral("100_Grafik")));
+		QVERIFY(tsv_set.isPrintable(QStringLiteral("100_Grafik")));
+		QVERIFY(! tsv_set.isLocked(QStringLiteral("100_Grafik")));
+
+		QVERIFY(tsv_set.contains(QStringLiteral("109_Kommentar")));
+		QCOMPARE(tsv_set.description(QStringLiteral("109_Kommentar")), QStringLiteral("Interne Notizen"));
+		QVERIFY(tsv_set.isVisible(QStringLiteral("109_Kommentar")));
+		QVERIFY(! tsv_set.isPrintable(QStringLiteral("109_Kommentar")));
+		QVERIFY(tsv_set.isLocked(QStringLiteral("109_Kommentar")));
+
+		// 4. XML export and import round-trip
+		const QByteArray xml_bytes = DrawingLayers::exportToXml(tsv_set);
+		QVERIFY(! xml_bytes.isEmpty());
+		DrawingLayers::Set xml_set;
+		QVERIFY(DrawingLayers::importFromXml(xml_set, xml_bytes, &count));
+		QCOMPARE(count, 6); // 4 fixed layers + 2 user layers
+		QVERIFY(xml_set.contains(QStringLiteral("100_Grafik")));
+		QVERIFY(xml_set.contains(QStringLiteral("109_Kommentar")));
+		QCOMPARE(xml_set.description(QStringLiteral("109_Kommentar")), QStringLiteral("Interne Notizen"));
+		QVERIFY(! xml_set.isPrintable(QStringLiteral("109_Kommentar")));
+		QVERIFY(xml_set.isLocked(QStringLiteral("109_Kommentar")));
+
+		// 5. LayersDialog export and import with UndoStack
+		QETProject project1;
+		project1.setDrawingLayers(tsv_set);
+		LayersDialog dlg1(&project1);
+		const QString export_file = m_dir.filePath(QStringLiteral("test_layers.csv"));
+		QVERIFY(dlg1.exportLayers(export_file));
+		QVERIFY(QFile::exists(export_file));
+
+		QETProject project2;
+		LayersDialog dlg2(&project2);
+		QVERIFY(dlg2.importLayers(export_file));
+		QVERIFY(project2.drawingLayers().contains(QStringLiteral("100_Grafik")));
+		QVERIFY(project2.drawingLayers().contains(QStringLiteral("109_Kommentar")));
+
+		// Verify undo reverts the import
+		QVERIFY(project2.undoStack()->canUndo());
+		project2.undoStack()->undo();
+		QVERIFY(! project2.drawingLayers().contains(QStringLiteral("100_Grafik")));
+		QVERIFY(! project2.drawingLayers().contains(QStringLiteral("109_Kommentar")));
 	}
 };
 

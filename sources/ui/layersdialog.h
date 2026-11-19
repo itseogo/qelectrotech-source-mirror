@@ -56,6 +56,8 @@ class LayersDialog : public QDialog
 		void setGroupLayers(const QString &name, const QStringList &layers);
 		void showGroup(const QString &name);
 		void filterLayers(const QString &filter_text);
+		bool exportLayers(const QString &file_path = QString());
+		bool importLayers(const QString &file_path = QString());
 
 	private slots:
 		void updateButtonStates();

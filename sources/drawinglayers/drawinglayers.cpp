@@ -482,4 +482,210 @@ namespace DrawingLayers
 			}
 		}
 	}
+
+	namespace
+	{
+		QString escapeCsvField(const QString &field, QChar delimiter)
+		{
+			if (field.contains(delimiter) || field.contains(QLatin1Char('"')) || field.contains(QLatin1Char('\n')) || field.contains(QLatin1Char('\r'))) {
+				QString escaped = field;
+				escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+				return QStringLiteral("\"%1\"").arg(escaped);
+			}
+			return field;
+		}
+
+		QStringList parseCsvLine(const QString &line, QChar delimiter)
+		{
+			QStringList fields;
+			QString current;
+			bool in_quotes = false;
+			for (int i = 0 ; i < line.length() ; ++i) {
+				const QChar c = line.at(i);
+				if (c == QLatin1Char('"')) {
+					if (in_quotes && i + 1 < line.length() && line.at(i + 1) == QLatin1Char('"')) {
+						current += QLatin1Char('"');
+						++i;
+					} else {
+						in_quotes = !in_quotes;
+					}
+				} else if (c == delimiter && !in_quotes) {
+					fields.append(current.trimmed());
+					current.clear();
+				} else {
+					current += c;
+				}
+			}
+			fields.append(current.trimmed());
+			return fields;
+		}
+
+		bool parseBoolValue(const QString &val, bool default_val = true)
+		{
+			const QString s = val.trimmed().toLower();
+			if (s.isEmpty()) return default_val;
+			if (s == QLatin1String("true") || s == QLatin1String("1") || s == QLatin1String("yes") ||
+			    s == QLatin1String("ja") || s == QLatin1String("[v]") || s == QLatin1String("[x]") ||
+			    s == QLatin1String("v") || s == QLatin1String("x") || s == QLatin1String("on")) {
+				return true;
+			}
+			if (s == QLatin1String("false") || s == QLatin1String("0") || s == QLatin1String("no") ||
+			    s == QLatin1String("nein") || s == QLatin1String("[ ]") || s == QLatin1String("[]") ||
+			    s == QLatin1String("off")) {
+				return false;
+			}
+			return default_val;
+		}
+	}
+
+	QString exportToCsv(const Set &set)
+	{
+		QString result;
+		result += QStringLiteral("Name,Description,Visible,Printable,Locked\n");
+		for (const Layer &layer : set.layers) {
+			QStringList fields;
+			fields << escapeCsvField(layer.name, QLatin1Char(','));
+			fields << escapeCsvField(layer.description, QLatin1Char(','));
+			fields << (layer.visible ? QStringLiteral("true") : QStringLiteral("false"));
+			fields << (layer.printable ? QStringLiteral("true") : QStringLiteral("false"));
+			fields << (layer.locked ? QStringLiteral("true") : QStringLiteral("false"));
+			result += fields.join(QLatin1Char(',')) + QLatin1Char('\n');
+		}
+		return result;
+	}
+
+	bool importFromCsv(Set &set, const QString &csv_content, int *imported_count)
+	{
+		if (imported_count) *imported_count = 0;
+		const QStringList lines = csv_content.split(QRegularExpression(QStringLiteral("\r\n|\n|\r")));
+		if (lines.isEmpty()) return false;
+
+		// Detect delimiter
+		QChar delimiter = QLatin1Char(',');
+		const QString first_line = lines.first();
+		if (first_line.contains(QLatin1Char('\t'))) delimiter = QLatin1Char('\t');
+		else if (first_line.contains(QLatin1Char(';'))) delimiter = QLatin1Char(';');
+
+		int name_col = -1, desc_col = -1, visible_col = -1, print_col = -1, lock_col = -1;
+		int start_line = 0;
+
+		const QStringList header_fields = parseCsvLine(first_line, delimiter);
+		for (int i = 0 ; i < header_fields.size() ; ++i) {
+			const QString h = header_fields.at(i).toLower();
+			if (name_col < 0 && (h == QLatin1String("name") || h == QLatin1String("ebene") || h == QLatin1String("layer"))) {
+				name_col = i;
+			} else if (desc_col < 0 && (h.contains(QLatin1String("beschreib")) || h.contains(QLatin1String("desc")))) {
+				desc_col = i;
+			} else if (visible_col < 0 && (h.contains(QLatin1String("sichtbar")) || h.contains(QLatin1String("visible")) || h.contains(QLatin1String("shown")))) {
+				visible_col = i;
+			} else if (print_col < 0 && (h.contains(QLatin1String("druck")) || h.contains(QLatin1String("print")))) {
+				print_col = i;
+			} else if (lock_col < 0 && (h.contains(QLatin1String("sperr")) || h.contains(QLatin1String("lock")))) {
+				lock_col = i;
+			}
+		}
+
+		if (name_col >= 0) {
+			start_line = 1;
+		} else {
+			// No recognized header row: assume default column order
+			name_col = 0;
+			desc_col = 1;
+			visible_col = 2;
+			print_col = 3;
+			lock_col = 4;
+		}
+
+		int count = 0;
+		for (int l = start_line ; l < lines.size() ; ++l) {
+			const QString line = lines.at(l).trimmed();
+			if (line.isEmpty()) continue;
+			const QStringList fields = parseCsvLine(line, delimiter);
+			if (name_col >= fields.size()) continue;
+
+			const QString name = fields.at(name_col).trimmed();
+			if (name.isEmpty()) continue;
+
+			const QString desc = (desc_col >= 0 && desc_col < fields.size()) ? fields.at(desc_col).trimmed() : QString();
+			const bool visible = (visible_col >= 0 && visible_col < fields.size()) ? parseBoolValue(fields.at(visible_col), true) : true;
+			const bool printable = (print_col >= 0 && print_col < fields.size()) ? parseBoolValue(fields.at(print_col), true) : true;
+			const bool locked = (lock_col >= 0 && lock_col < fields.size()) ? parseBoolValue(fields.at(lock_col), false) : false;
+
+			const FixedKind fk = fixedKindOf(name);
+			bool found = false;
+			for (Layer &existing : set.layers) {
+				if ((fk != FixedKind::None && existing.fixed_kind == fk) || existing.name == name) {
+					if (!desc.isEmpty()) existing.description = desc;
+					existing.visible = visible;
+					existing.printable = printable;
+					existing.locked = locked;
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				set.layers.append({name, desc, visible, printable, locked, fk});
+			}
+			++count;
+		}
+		if (imported_count) *imported_count = count;
+		return count > 0;
+	}
+
+	QByteArray exportToXml(const Set &set)
+	{
+		QDomDocument doc;
+		doc.appendChild(set.toXml(doc));
+		return doc.toByteArray(4);
+	}
+
+	bool importFromXml(Set &set, const QByteArray &xml_content, int *imported_count)
+	{
+		if (imported_count) *imported_count = 0;
+		QDomDocument doc;
+		if (!doc.setContent(xml_content)) return false;
+
+		QDomElement layers_elem = doc.documentElement();
+		if (layers_elem.tagName() != QLatin1String("layers")) {
+			layers_elem = layers_elem.firstChildElement(QStringLiteral("layers"));
+		}
+		if (layers_elem.isNull()) return false;
+
+		const Set imported_set = Set::fromXml(layers_elem);
+		int count = 0;
+		for (const Layer &imported_layer : imported_set.layers) {
+			bool found = false;
+			for (Layer &existing : set.layers) {
+				if ((imported_layer.isFixed() && existing.fixed_kind == imported_layer.fixed_kind) || existing.name == imported_layer.name) {
+					if (!imported_layer.description.isEmpty()) existing.description = imported_layer.description;
+					existing.visible = imported_layer.visible;
+					existing.printable = imported_layer.printable;
+					existing.locked = imported_layer.locked;
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				set.layers.append(imported_layer);
+			}
+			++count;
+		}
+
+		for (const Group &group : imported_set.groups) {
+			bool found = false;
+			for (Group &existing_group : set.groups) {
+				if (existing_group.name == group.name) {
+					existing_group.layers = group.layers;
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				set.groups.append(group);
+			}
+		}
+
+		if (imported_count) *imported_count = count;
+		return count > 0;
+	}
 }

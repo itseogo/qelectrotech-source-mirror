@@ -30,6 +30,8 @@
 
 #include <QApplication>
 #include <QDialogButtonBox>
+#include <QFile>
+#include <QFileDialog>
 #include <QGraphicsObject>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -102,6 +104,8 @@ LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 	m_remove_btn = button(layer_buttons, tr("Remove"), "layerRemove");
 	m_put_btn = button(layer_buttons, tr("Put the selection on it"), "layerPut");
 	m_take_btn = button(layer_buttons, tr("Take the selection off"), "layerTake");
+	auto *import_btn = button(layer_buttons, tr("Import..."), "layerImport");
+	auto *export_btn = button(layer_buttons, tr("Export..."), "layerExport");
 	layer_buttons->addStretch();
 	layers_layout->addLayout(layer_buttons);
 	layout->addWidget(layers_box, 1);
@@ -125,6 +129,17 @@ LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 	layout->addWidget(buttons);
 
 	connect(m_filter_edit, &QLineEdit::textChanged, this, &LayersDialog::filterLayers);
+
+	connect(import_btn, &QPushButton::clicked, this, [this]() {
+		const QString file = QFileDialog::getOpenFileName(this, tr("Import layers"), QString(),
+		                                                  tr("Layer files (*.csv *.qetlayers *.xml);;CSV files (*.csv);;XML files (*.qetlayers *.xml)"));
+		if (!file.isEmpty()) importLayers(file);
+	});
+	connect(export_btn, &QPushButton::clicked, this, [this]() {
+		const QString file = QFileDialog::getSaveFileName(this, tr("Export layers"), QStringLiteral("layers.csv"),
+		                                                  tr("CSV files (*.csv);;XML files (*.qetlayers *.xml)"));
+		if (!file.isEmpty()) exportLayers(file);
+	});
 
 	connect(add, &QPushButton::clicked, this, [this]() {
 		const QString name = QInputDialog::getText(this, tr("Add a layer"), tr("Name of the layer:"));
@@ -486,4 +501,50 @@ void LayersDialog::showGroup(const QString &name)
 			m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
 		return;
 	}
+}
+
+bool LayersDialog::exportLayers(const QString &file_path)
+{
+	if (!m_project || file_path.isEmpty()) return false;
+	QFile f(file_path);
+	if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+		QET::QetMessageBox::critical(this, tr("Export layers"), tr("Unable to open file for writing: %1").arg(file_path));
+		return false;
+	}
+	if (file_path.endsWith(QStringLiteral(".xml"), Qt::CaseInsensitive) || file_path.endsWith(QStringLiteral(".qetlayers"), Qt::CaseInsensitive)) {
+		f.write(DrawingLayers::exportToXml(m_project->drawingLayers()));
+	} else {
+		f.write(DrawingLayers::exportToCsv(m_project->drawingLayers()).toUtf8());
+	}
+	f.close();
+	QET::QetMessageBox::information(this, tr("Export layers"), tr("Layers exported successfully."));
+	return true;
+}
+
+bool LayersDialog::importLayers(const QString &file_path)
+{
+	if (!m_project || file_path.isEmpty()) return false;
+	QFile f(file_path);
+	if (!f.open(QIODevice::ReadOnly)) {
+		QET::QetMessageBox::critical(this, tr("Import layers"), tr("Unable to open file for reading: %1").arg(file_path));
+		return false;
+	}
+	const QByteArray data = f.readAll();
+	f.close();
+
+	Set set = m_project->drawingLayers();
+	int count = 0;
+	bool ok = false;
+	if (file_path.endsWith(QStringLiteral(".xml"), Qt::CaseInsensitive) || file_path.endsWith(QStringLiteral(".qetlayers"), Qt::CaseInsensitive)) {
+		ok = DrawingLayers::importFromXml(set, data, &count);
+	} else {
+		ok = DrawingLayers::importFromCsv(set, QString::fromUtf8(data), &count);
+	}
+	if (!ok || count == 0) {
+		QET::QetMessageBox::warning(this, tr("Import layers"), tr("No valid layers found in file."));
+		return false;
+	}
+	m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
+	QET::QetMessageBox::information(this, tr("Import layers"), tr("Successfully imported %1 layers.").arg(count));
+	return true;
 }
