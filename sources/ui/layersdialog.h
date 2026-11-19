@@ -38,47 +38,47 @@ class QLineEdit;
 class LayersDialog : public QDialog
 {
 	Q_OBJECT
-	public:
-		explicit LayersDialog(QETProject *project, QWidget *parent = nullptr);
+  public:
+	explicit LayersDialog(QETProject* project, QWidget* parent = nullptr);
 
-	public slots:
-		void refresh();
-		bool addLayer(const QString &name, const QString &description = QString());
-		bool renameLayer(const QString &name, const QString &new_name);
-		void removeLayer(const QString &name);
-		void setLayerVisible(const QString &name, bool visible);
-		void setLayerPrintable(const QString &name, bool printable);
-		void setLayerLocked(const QString &name, bool locked);
-		void setLayerDescription(const QString &name, const QString &description);
-		int putSelectionOnLayer(const QString &layer, Diagram *folio = nullptr);
-		bool addGroup(const QString &name);
-		void removeGroup(const QString &name);
-		void setGroupLayers(const QString &name, const QStringList &layers);
-		void showGroup(const QString &name);
-		void filterLayers(const QString &filter_text);
-		bool exportLayers(const QString &file_path = QString());
-		bool importLayers(const QString &file_path = QString());
+  public slots:
+	void refresh();
+	bool addLayer(const QString& name, const QString& description = QString());
+	bool renameLayer(const QString& name, const QString& new_name);
+	void removeLayer(const QString& name);
+	void setLayerVisible(const QString& name, bool visible);
+	void setLayerPrintable(const QString& name, bool printable);
+	void setLayerLocked(const QString& name, bool locked);
+	void setLayerDescription(const QString& name, const QString& description);
+	int	 putSelectionOnLayer(const QString& layer, Diagram* folio = nullptr);
+	bool addGroup(const QString& name);
+	void removeGroup(const QString& name);
+	void setGroupLayers(const QString& name, const QStringList& layers);
+	void showGroup(const QString& name);
+	void filterLayers(const QString& filter_text);
+	bool exportLayers(const QString& file_path = QString());
+	bool importLayers(const QString& file_path = QString());
 
-	private slots:
-		void updateButtonStates();
+  private slots:
+	void updateButtonStates();
 
-	private:
-		QString currentLayer() const;
-		QString currentGroup() const;
-		void showGroupMembers();
-		void buildFolios();
+  private:
+	QString currentLayer() const;
+	QString currentGroup() const;
+	void	showGroupMembers();
+	void	buildFolios();
 
-		QPointer<QETProject> m_project;
-		QLineEdit *m_filter_edit = nullptr;
-		QTableWidget *m_layers;
-		QListWidget *m_groups;
-		QListWidget *m_members;
-		QLabel *m_summary;
-		QPushButton *m_rename_btn = nullptr;
-		QPushButton *m_remove_btn = nullptr;
-		QPushButton *m_put_btn = nullptr;
-		QPushButton *m_take_btn = nullptr;
-		bool m_refreshing = false;
+	QPointer<QETProject> m_project;
+	QLineEdit*			 m_filter_edit = nullptr;
+	QTableWidget*		 m_layers;
+	QListWidget*		 m_groups;
+	QListWidget*		 m_members;
+	QLabel*				 m_summary;
+	QPushButton*		 m_rename_btn = nullptr;
+	QPushButton*		 m_remove_btn = nullptr;
+	QPushButton*		 m_put_btn	  = nullptr;
+	QPushButton*		 m_take_btn	  = nullptr;
+	bool				 m_refreshing = false;
 };
 
 #endif // LAYERSDIALOG_H

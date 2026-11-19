@@ -280,7 +280,7 @@ class tst_drawinglayers : public QObject
 		{
 			ProjectPrintWindow window(&project, new QPrinter());
 			auto*			   choice = window.findChild<QComboBox*>(
-				QStringLiteral("m_layer_group_cb"));
+				 QStringLiteral("m_layer_group_cb"));
 			QVERIFY(choice);
 			QCOMPARE(choice->count(), 2);
 			choice->setCurrentIndex(1);
@@ -439,7 +439,7 @@ class tst_drawinglayers : public QObject
 		{
 			ProjectPrintWindow window(&project, new QPrinter());
 			auto*			   choice = window.findChild<QComboBox*>(
-				QStringLiteral("m_layer_group_cb"));
+				 QStringLiteral("m_layer_group_cb"));
 			QVERIFY(choice);
 			choice->setCurrentIndex(1); // Select "No Wire Numbers"
 			QVERIFY(! cond_text->isVisible());
@@ -567,39 +567,52 @@ class tst_drawinglayers : public QObject
 	{
 		// 1. Export Set to CSV
 		DrawingLayers::Set orig;
-		orig.layers.append({QStringLiteral("Notes"), QStringLiteral("Customer notes"), true, false, true});
+		orig.layers.append(
+			{QStringLiteral("Notes"),
+			 QStringLiteral("Customer notes"),
+			 true,
+			 false,
+			 true});
 		const QString csv = DrawingLayers::exportToCsv(orig);
-		QVERIFY(csv.contains(QStringLiteral("Name,Description,Visible,Printable,Locked")));
-		QVERIFY(csv.contains(QStringLiteral("Notes,Customer notes,true,false,true")));
+		QVERIFY(csv.contains(
+			QStringLiteral("Name,Description,Visible,Printable,Locked")));
+		QVERIFY(csv.contains(
+			QStringLiteral("Notes,Customer notes,true,false,true")));
 
 		// 2. Import standard CSV
 		DrawingLayers::Set imported_csv_set;
-		int count = 0;
+		int				   count = 0;
 		QVERIFY(DrawingLayers::importFromCsv(imported_csv_set, csv, &count));
 		QCOMPARE(count, 5); // 4 fixed system layers + 1 user layer
 		QVERIFY(imported_csv_set.contains(QStringLiteral("Notes")));
-		QCOMPARE(imported_csv_set.description(QStringLiteral("Notes")), QStringLiteral("Customer notes"));
+		QCOMPARE(
+			imported_csv_set.description(QStringLiteral("Notes")),
+			QStringLiteral("Customer notes"));
 		QVERIFY(imported_csv_set.isVisible(QStringLiteral("Notes")));
 		QVERIFY(! imported_csv_set.isPrintable(QStringLiteral("Notes")));
 		QVERIFY(imported_csv_set.isLocked(QStringLiteral("Notes")));
 
-		// 3. Import TSV table with German headers and CAD bracket booleans ([v] / [ ])
+		// 3. Import TSV table with German headers and CAD bracket booleans ([v]
+		// / [ ])
 		const QString tsv_data = QStringLiteral(
 			"Ebene\tBeschreibung\tSichtbar\tDrucken\tGesperrt\n"
 			"100_Grafik\tAllgemeine Grafik\t[v]\t[v]\t[ ]\n"
-			"109_Kommentar\tInterne Notizen\t[v]\t[ ]\t[v]\n"
-		);
+			"109_Kommentar\tInterne Notizen\t[v]\t[ ]\t[v]\n");
 		DrawingLayers::Set tsv_set;
 		QVERIFY(DrawingLayers::importFromCsv(tsv_set, tsv_data, &count));
 		QCOMPARE(count, 2);
 		QVERIFY(tsv_set.contains(QStringLiteral("100_Grafik")));
-		QCOMPARE(tsv_set.description(QStringLiteral("100_Grafik")), QStringLiteral("Allgemeine Grafik"));
+		QCOMPARE(
+			tsv_set.description(QStringLiteral("100_Grafik")),
+			QStringLiteral("Allgemeine Grafik"));
 		QVERIFY(tsv_set.isVisible(QStringLiteral("100_Grafik")));
 		QVERIFY(tsv_set.isPrintable(QStringLiteral("100_Grafik")));
 		QVERIFY(! tsv_set.isLocked(QStringLiteral("100_Grafik")));
 
 		QVERIFY(tsv_set.contains(QStringLiteral("109_Kommentar")));
-		QCOMPARE(tsv_set.description(QStringLiteral("109_Kommentar")), QStringLiteral("Interne Notizen"));
+		QCOMPARE(
+			tsv_set.description(QStringLiteral("109_Kommentar")),
+			QStringLiteral("Interne Notizen"));
 		QVERIFY(tsv_set.isVisible(QStringLiteral("109_Kommentar")));
 		QVERIFY(! tsv_set.isPrintable(QStringLiteral("109_Kommentar")));
 		QVERIFY(tsv_set.isLocked(QStringLiteral("109_Kommentar")));
@@ -612,29 +625,36 @@ class tst_drawinglayers : public QObject
 		QCOMPARE(count, 6); // 4 fixed layers + 2 user layers
 		QVERIFY(xml_set.contains(QStringLiteral("100_Grafik")));
 		QVERIFY(xml_set.contains(QStringLiteral("109_Kommentar")));
-		QCOMPARE(xml_set.description(QStringLiteral("109_Kommentar")), QStringLiteral("Interne Notizen"));
+		QCOMPARE(
+			xml_set.description(QStringLiteral("109_Kommentar")),
+			QStringLiteral("Interne Notizen"));
 		QVERIFY(! xml_set.isPrintable(QStringLiteral("109_Kommentar")));
 		QVERIFY(xml_set.isLocked(QStringLiteral("109_Kommentar")));
 
 		// 5. LayersDialog export and import with UndoStack
 		QETProject project1;
 		project1.setDrawingLayers(tsv_set);
-		LayersDialog dlg1(&project1);
-		const QString export_file = m_dir.filePath(QStringLiteral("test_layers.csv"));
+		LayersDialog  dlg1(&project1);
+		const QString export_file =
+			m_dir.filePath(QStringLiteral("test_layers.csv"));
 		QVERIFY(dlg1.exportLayers(export_file));
 		QVERIFY(QFile::exists(export_file));
 
-		QETProject project2;
+		QETProject	 project2;
 		LayersDialog dlg2(&project2);
 		QVERIFY(dlg2.importLayers(export_file));
-		QVERIFY(project2.drawingLayers().contains(QStringLiteral("100_Grafik")));
-		QVERIFY(project2.drawingLayers().contains(QStringLiteral("109_Kommentar")));
+		QVERIFY(
+			project2.drawingLayers().contains(QStringLiteral("100_Grafik")));
+		QVERIFY(
+			project2.drawingLayers().contains(QStringLiteral("109_Kommentar")));
 
 		// Verify undo reverts the import
 		QVERIFY(project2.undoStack()->canUndo());
 		project2.undoStack()->undo();
-		QVERIFY(! project2.drawingLayers().contains(QStringLiteral("100_Grafik")));
-		QVERIFY(! project2.drawingLayers().contains(QStringLiteral("109_Kommentar")));
+		QVERIFY(
+			! project2.drawingLayers().contains(QStringLiteral("100_Grafik")));
+		QVERIFY(! project2.drawingLayers().contains(
+			QStringLiteral("109_Kommentar")));
 	}
 };
 

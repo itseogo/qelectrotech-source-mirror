@@ -31,99 +31,108 @@ namespace DrawingLayers
 {
 	namespace
 	{
-		const int LayerKey = 0x4c4159;       // "LAY"
+		const int LayerKey		 = 0x4c4159; // "LAY"
 		const int LayerHiddenKey = 0x4c4148; // "LAH"
 
-		void applyFixedKindItem(QGraphicsItem *item, bool show, ShownKinds::Kind kind)
+		void applyFixedKindItem(
+			QGraphicsItem* item, bool show, ShownKinds::Kind kind)
 		{
-			if (!item) return;
-			if (!show) {
-				if (item->isVisibleTo(item->parentItem())) {
+			if (! item) return;
+			if (! show)
+			{
+				if (item->isVisibleTo(item->parentItem()))
+				{
 					item->setVisible(false);
 					item->setData(LayerHiddenKey, true);
-				} else if (item->data(LayerHiddenKey).toBool()) {
+				}
+				else if (item->data(LayerHiddenKey).toBool())
+				{
 					item->setVisible(false);
 				}
-			} else {
-				if (item->data(LayerHiddenKey).toBool()) {
+			}
+			else
+			{
+				if (item->data(LayerHiddenKey).toBool())
+				{
 					item->setData(LayerHiddenKey, QVariant());
 					ShownKinds::setVisible(item, true);
 				}
 			}
 		}
-	}
+	} // namespace
 
 	QString fixedKindName(FixedKind kind)
 	{
-		switch (kind) {
-			case FixedKind::FrameAndTitleBlock:
-				return QStringLiteral("Frame and title block");
-			case FixedKind::WireNumbers:
-				return QStringLiteral("Wire numbers");
-			case FixedKind::SymbolTexts:
-				return QStringLiteral("Symbol texts");
-			case FixedKind::CrossReferences:
-				return QStringLiteral("Cross-references");
-			default:
-				return QString();
+		switch (kind)
+		{
+		case FixedKind::FrameAndTitleBlock:
+			return QStringLiteral("Frame and title block");
+		case FixedKind::WireNumbers: return QStringLiteral("Wire numbers");
+		case FixedKind::SymbolTexts: return QStringLiteral("Symbol texts");
+		case FixedKind::CrossReferences:
+			return QStringLiteral("Cross-references");
+		default: return QString();
 		}
 	}
 
 	QString fixedKindDisplayName(FixedKind kind)
 	{
-		switch (kind) {
-			case FixedKind::FrameAndTitleBlock:
-				return QObject::tr("Frame and title block");
-			case FixedKind::WireNumbers:
-				return QObject::tr("Wire numbers");
-			case FixedKind::SymbolTexts:
-				return QObject::tr("Symbol texts");
-			case FixedKind::CrossReferences:
-				return QObject::tr("Cross-references");
-			default:
-				return QString();
+		switch (kind)
+		{
+		case FixedKind::FrameAndTitleBlock:
+			return QObject::tr("Frame and title block");
+		case FixedKind::WireNumbers: return QObject::tr("Wire numbers");
+		case FixedKind::SymbolTexts: return QObject::tr("Symbol texts");
+		case FixedKind::CrossReferences: return QObject::tr("Cross-references");
+		default: return QString();
 		}
 	}
 
 	QString fixedKindAttribute(FixedKind kind)
 	{
-		switch (kind) {
-			case FixedKind::FrameAndTitleBlock:
-				return QStringLiteral("frame_titleblock");
-			case FixedKind::WireNumbers:
-				return QStringLiteral("wire_numbers");
-			case FixedKind::SymbolTexts:
-				return QStringLiteral("symbol_texts");
-			case FixedKind::CrossReferences:
-				return QStringLiteral("cross_references");
-			default:
-				return QString();
+		switch (kind)
+		{
+		case FixedKind::FrameAndTitleBlock:
+			return QStringLiteral("frame_titleblock");
+		case FixedKind::WireNumbers: return QStringLiteral("wire_numbers");
+		case FixedKind::SymbolTexts: return QStringLiteral("symbol_texts");
+		case FixedKind::CrossReferences:
+			return QStringLiteral("cross_references");
+		default: return QString();
 		}
 	}
 
-	FixedKind fixedKindFromAttribute(const QString &attr)
+	FixedKind fixedKindFromAttribute(const QString& attr)
 	{
-		if (attr == QLatin1String("frame_titleblock")) return FixedKind::FrameAndTitleBlock;
-		if (attr == QLatin1String("wire_numbers")) return FixedKind::WireNumbers;
-		if (attr == QLatin1String("symbol_texts")) return FixedKind::SymbolTexts;
-		if (attr == QLatin1String("cross_references")) return FixedKind::CrossReferences;
-		return FixedKind::None;
-	}
-
-	FixedKind fixedKindOf(const QString &name)
-	{
-		if (name == fixedKindName(FixedKind::FrameAndTitleBlock) || name == fixedKindDisplayName(FixedKind::FrameAndTitleBlock))
+		if (attr == QLatin1String("frame_titleblock"))
 			return FixedKind::FrameAndTitleBlock;
-		if (name == fixedKindName(FixedKind::WireNumbers) || name == fixedKindDisplayName(FixedKind::WireNumbers))
+		if (attr == QLatin1String("wire_numbers"))
 			return FixedKind::WireNumbers;
-		if (name == fixedKindName(FixedKind::SymbolTexts) || name == fixedKindDisplayName(FixedKind::SymbolTexts))
+		if (attr == QLatin1String("symbol_texts"))
 			return FixedKind::SymbolTexts;
-		if (name == fixedKindName(FixedKind::CrossReferences) || name == fixedKindDisplayName(FixedKind::CrossReferences))
+		if (attr == QLatin1String("cross_references"))
 			return FixedKind::CrossReferences;
 		return FixedKind::None;
 	}
 
-	bool isFixed(const QString &name)
+	FixedKind fixedKindOf(const QString& name)
+	{
+		if (name == fixedKindName(FixedKind::FrameAndTitleBlock)
+			|| name == fixedKindDisplayName(FixedKind::FrameAndTitleBlock))
+			return FixedKind::FrameAndTitleBlock;
+		if (name == fixedKindName(FixedKind::WireNumbers)
+			|| name == fixedKindDisplayName(FixedKind::WireNumbers))
+			return FixedKind::WireNumbers;
+		if (name == fixedKindName(FixedKind::SymbolTexts)
+			|| name == fixedKindDisplayName(FixedKind::SymbolTexts))
+			return FixedKind::SymbolTexts;
+		if (name == fixedKindName(FixedKind::CrossReferences)
+			|| name == fixedKindDisplayName(FixedKind::CrossReferences))
+			return FixedKind::CrossReferences;
+		return FixedKind::None;
+	}
+
+	bool isFixed(const QString& name)
 	{
 		return fixedKindOf(name) != FixedKind::None;
 	}
@@ -131,41 +140,59 @@ namespace DrawingLayers
 	QList<Layer> defaultFixedLayers()
 	{
 		return {
-			{fixedKindName(FixedKind::FrameAndTitleBlock), QString(), true, true, false, FixedKind::FrameAndTitleBlock},
-			{fixedKindName(FixedKind::WireNumbers),        QString(), true, true, false, FixedKind::WireNumbers},
-			{fixedKindName(FixedKind::SymbolTexts),        QString(), true, true, false, FixedKind::SymbolTexts},
-			{fixedKindName(FixedKind::CrossReferences),    QString(), true, true, false, FixedKind::CrossReferences}
-		};
+			{fixedKindName(FixedKind::FrameAndTitleBlock),
+			 QString(),
+			 true,
+			 true,
+			 false,
+			 FixedKind::FrameAndTitleBlock},
+			{fixedKindName(FixedKind::WireNumbers),
+			 QString(),
+			 true,
+			 true,
+			 false,
+			 FixedKind::WireNumbers},
+			{fixedKindName(FixedKind::SymbolTexts),
+			 QString(),
+			 true,
+			 true,
+			 false,
+			 FixedKind::SymbolTexts},
+			{fixedKindName(FixedKind::CrossReferences),
+			 QString(),
+			 true,
+			 true,
+			 false,
+			 FixedKind::CrossReferences}};
 	}
 
-	Set::Set()
-	{
-		ensureFixedLayers();
-	}
+	Set::Set() { ensureFixedLayers(); }
 
 	void Set::ensureFixedLayers()
 	{
 		const auto fixed = defaultFixedLayers();
-		for (int i = 0 ; i < fixed.size() ; ++i) {
-			const auto &fl = fixed.at(i);
-			bool found = false;
-			for (const Layer &l : layers) {
-				if (l.fixed_kind == fl.fixed_kind || l.name == fl.name) {
+		for (int i = 0; i < fixed.size(); ++i)
+		{
+			const auto& fl	  = fixed.at(i);
+			bool		found = false;
+			for (const Layer& l : layers)
+			{
+				if (l.fixed_kind == fl.fixed_kind || l.name == fl.name)
+				{
 					found = true;
 					break;
 				}
 			}
-			if (!found) {
-				layers.insert(i, fl);
-			}
+			if (! found) { layers.insert(i, fl); }
 		}
 	}
 
 	QList<Layer> Set::userLayers() const
 	{
 		QList<Layer> result;
-		for (const Layer &l : layers) {
-			if (!l.isFixed()) result.append(l);
+		for (const Layer& l : layers)
+		{
+			if (! l.isFixed()) result.append(l);
 		}
 		return result;
 	}
@@ -173,7 +200,8 @@ namespace DrawingLayers
 	QList<Layer> Set::fixedLayers() const
 	{
 		QList<Layer> result;
-		for (const Layer &l : layers) {
+		for (const Layer& l : layers)
+		{
 			if (l.isFixed()) result.append(l);
 		}
 		return result;
@@ -181,21 +209,24 @@ namespace DrawingLayers
 
 	bool Set::isEmpty() const
 	{
-		if (!groups.isEmpty()) return false;
-		if (!userLayers().isEmpty()) return false;
-		for (const Layer &layer : layers) {
-			if (layer.isFixed()) {
-				if (!layer.visible || !layer.printable || layer.locked || !layer.description.isEmpty())
+		if (! groups.isEmpty()) return false;
+		if (! userLayers().isEmpty()) return false;
+		for (const Layer& layer : layers)
+		{
+			if (layer.isFixed())
+			{
+				if (! layer.visible || ! layer.printable || layer.locked
+					|| ! layer.description.isEmpty())
 					return false;
 			}
 		}
 		return true;
 	}
 
-	bool Set::contains(const QString &name) const
+	bool Set::contains(const QString& name) const
 	{
 		if (isFixed(name)) return true;
-		for (const Layer &layer : layers)
+		for (const Layer& layer : layers)
 			if (layer.name == name) return true;
 		return false;
 	}
@@ -203,18 +234,19 @@ namespace DrawingLayers
 	bool Set::isVisible(FixedKind kind) const
 	{
 		if (kind == FixedKind::None) return true;
-		for (const Layer &layer : layers) {
+		for (const Layer& layer : layers)
+		{
 			if (layer.fixed_kind == kind || layer.name == fixedKindName(kind))
 				return layer.visible;
 		}
 		return true;
 	}
 
-	bool Set::isVisible(const QString &name) const
+	bool Set::isVisible(const QString& name) const
 	{
 		const FixedKind fk = fixedKindOf(name);
 		if (fk != FixedKind::None) return isVisible(fk);
-		for (const Layer &layer : layers)
+		for (const Layer& layer : layers)
 			if (layer.name == name) return layer.visible;
 		return true;
 	}
@@ -222,18 +254,19 @@ namespace DrawingLayers
 	bool Set::isPrintable(FixedKind kind) const
 	{
 		if (kind == FixedKind::None) return true;
-		for (const Layer &layer : layers) {
+		for (const Layer& layer : layers)
+		{
 			if (layer.fixed_kind == kind || layer.name == fixedKindName(kind))
 				return layer.printable;
 		}
 		return true;
 	}
 
-	bool Set::isPrintable(const QString &name) const
+	bool Set::isPrintable(const QString& name) const
 	{
 		const FixedKind fk = fixedKindOf(name);
 		if (fk != FixedKind::None) return isPrintable(fk);
-		for (const Layer &layer : layers)
+		for (const Layer& layer : layers)
 			if (layer.name == name) return layer.printable;
 		return true;
 	}
@@ -241,27 +274,30 @@ namespace DrawingLayers
 	bool Set::isLocked(FixedKind kind) const
 	{
 		if (kind == FixedKind::None) return false;
-		for (const Layer &layer : layers) {
+		for (const Layer& layer : layers)
+		{
 			if (layer.fixed_kind == kind || layer.name == fixedKindName(kind))
 				return layer.locked;
 		}
 		return false;
 	}
 
-	bool Set::isLocked(const QString &name) const
+	bool Set::isLocked(const QString& name) const
 	{
 		const FixedKind fk = fixedKindOf(name);
 		if (fk != FixedKind::None) return isLocked(fk);
-		for (const Layer &layer : layers)
+		for (const Layer& layer : layers)
 			if (layer.name == name) return layer.locked;
 		return false;
 	}
 
-	QString Set::description(const QString &name) const
+	QString Set::description(const QString& name) const
 	{
 		const FixedKind fk = fixedKindOf(name);
-		for (const Layer &layer : layers) {
-			if (layer.name == name || (fk != FixedKind::None && layer.fixed_kind == fk))
+		for (const Layer& layer : layers)
+		{
+			if (layer.name == name
+				|| (fk != FixedKind::None && layer.fixed_kind == fk))
 				return layer.description;
 		}
 		return QString();
@@ -270,54 +306,75 @@ namespace DrawingLayers
 	QStringList Set::names() const
 	{
 		QStringList list;
-		for (const Layer &layer : layers) list << layer.name;
+		for (const Layer& layer : layers) list << layer.name;
 		return list;
 	}
 
-	Set Set::showing(const Group &group) const
+	Set Set::showing(const Group& group) const
 	{
 		Set set = *this;
-		for (Layer &layer : set.layers) layer.visible = group.layers.contains(layer.name);
+		for (Layer& layer : set.layers)
+			layer.visible = group.layers.contains(layer.name);
 		return set;
 	}
 
 	Set Set::forPrinting() const
 	{
 		Set set = *this;
-		for (Layer &layer : set.layers) {
-			if (!layer.printable) {
-				layer.visible = false;
-			}
+		for (Layer& layer : set.layers)
+		{
+			if (! layer.printable) { layer.visible = false; }
 		}
 		return set;
 	}
 
-	QDomElement Set::toXml(QDomDocument &document) const
+	QDomElement Set::toXml(QDomDocument& document) const
 	{
 		QDomElement root = document.createElement(QStringLiteral("layers"));
-		for (const Layer &layer : layers) {
-			QDomElement element = document.createElement(QStringLiteral("layer"));
+		for (const Layer& layer : layers)
+		{
+			QDomElement element =
+				document.createElement(QStringLiteral("layer"));
 			element.setAttribute(QStringLiteral("name"), layer.name);
-			if (!layer.description.isEmpty()) {
-				element.setAttribute(QStringLiteral("description"), layer.description);
+			if (! layer.description.isEmpty())
+			{
+				element.setAttribute(
+					QStringLiteral("description"),
+					layer.description);
 			}
-			element.setAttribute(QStringLiteral("visible"), layer.visible ? QStringLiteral("true") : QStringLiteral("false"));
-			if (!layer.printable) {
-				element.setAttribute(QStringLiteral("printable"), QStringLiteral("false"));
+			element.setAttribute(
+				QStringLiteral("visible"),
+				layer.visible ? QStringLiteral("true") :
+								QStringLiteral("false"));
+			if (! layer.printable)
+			{
+				element.setAttribute(
+					QStringLiteral("printable"),
+					QStringLiteral("false"));
 			}
-			if (layer.locked) {
-				element.setAttribute(QStringLiteral("locked"), QStringLiteral("true"));
+			if (layer.locked)
+			{
+				element.setAttribute(
+					QStringLiteral("locked"),
+					QStringLiteral("true"));
 			}
-			if (layer.isFixed()) {
-				element.setAttribute(QStringLiteral("fixed"), fixedKindAttribute(layer.fixed_kind));
+			if (layer.isFixed())
+			{
+				element.setAttribute(
+					QStringLiteral("fixed"),
+					fixedKindAttribute(layer.fixed_kind));
 			}
 			root.appendChild(element);
 		}
-		for (const Group &group : groups) {
-			QDomElement element = document.createElement(QStringLiteral("layer_group"));
+		for (const Group& group : groups)
+		{
+			QDomElement element =
+				document.createElement(QStringLiteral("layer_group"));
 			element.setAttribute(QStringLiteral("name"), group.name);
-			for (const QString &name : group.layers) {
-				QDomElement member = document.createElement(QStringLiteral("member"));
+			for (const QString& name : group.layers)
+			{
+				QDomElement member =
+					document.createElement(QStringLiteral("member"));
 				member.setAttribute(QStringLiteral("name"), name);
 				element.appendChild(member);
 			}
@@ -326,95 +383,117 @@ namespace DrawingLayers
 		return root;
 	}
 
-	Set Set::fromXml(const QDomElement &element)
+	Set Set::fromXml(const QDomElement& element)
 	{
 		Set set;
 		if (element.isNull()) return set;
 
-		for (QDomElement e = element.firstChildElement(QStringLiteral("layer")) ; !e.isNull()
-			 ; e = e.nextSiblingElement(QStringLiteral("layer"))) {
+		for (QDomElement e = element.firstChildElement(QStringLiteral("layer"));
+			 ! e.isNull();
+			 e = e.nextSiblingElement(QStringLiteral("layer")))
+		{
 			const QString name = e.attribute(QStringLiteral("name")).trimmed();
 			if (name.isEmpty()) continue;
 			const QString desc = e.attribute(QStringLiteral("description"));
-			const bool visible = (e.attribute(QStringLiteral("visible")) != QLatin1String("false"));
-			const bool printable = (e.attribute(QStringLiteral("printable")) != QLatin1String("false"));
-			const bool locked = (e.attribute(QStringLiteral("locked")) == QLatin1String("true"));
+			const bool	  visible =
+				(e.attribute(QStringLiteral("visible"))
+				 != QLatin1String("false"));
+			const bool printable =
+				(e.attribute(QStringLiteral("printable"))
+				 != QLatin1String("false"));
+			const bool locked =
+				(e.attribute(QStringLiteral("locked"))
+				 == QLatin1String("true"));
 
 			FixedKind fk = FixedKind::None;
-			if (e.hasAttribute(QStringLiteral("fixed"))) {
-				fk = fixedKindFromAttribute(e.attribute(QStringLiteral("fixed")));
-			} else {
+			if (e.hasAttribute(QStringLiteral("fixed")))
+			{
+				fk = fixedKindFromAttribute(
+					e.attribute(QStringLiteral("fixed")));
+			}
+			else
+			{
 				fk = fixedKindOf(name);
 			}
 
 			bool found = false;
-			for (Layer &l : set.layers) {
-				if ((fk != FixedKind::None && l.fixed_kind == fk) || l.name == name) {
+			for (Layer& l : set.layers)
+			{
+				if ((fk != FixedKind::None && l.fixed_kind == fk)
+					|| l.name == name)
+				{
 					l.description = desc;
-					l.visible = visible;
-					l.printable = printable;
-					l.locked = locked;
-					l.fixed_kind = fk;
-					found = true;
+					l.visible	  = visible;
+					l.printable	  = printable;
+					l.locked	  = locked;
+					l.fixed_kind  = fk;
+					found		  = true;
 					break;
 				}
 			}
-			if (!found) {
+			if (! found)
+			{
 				set.layers.append({name, desc, visible, printable, locked, fk});
 			}
 		}
 		set.groups.clear();
-		for (QDomElement e = element.firstChildElement(QStringLiteral("layer_group")) ; !e.isNull()
-			 ; e = e.nextSiblingElement(QStringLiteral("layer_group"))) {
+		for (QDomElement e =
+				 element.firstChildElement(QStringLiteral("layer_group"));
+			 ! e.isNull();
+			 e = e.nextSiblingElement(QStringLiteral("layer_group")))
+		{
 			Group group;
 			group.name = e.attribute(QStringLiteral("name")).trimmed();
-			for (QDomElement m = e.firstChildElement(QStringLiteral("member")) ; !m.isNull()
-				 ; m = m.nextSiblingElement(QStringLiteral("member")))
+			for (QDomElement m = e.firstChildElement(QStringLiteral("member"));
+				 ! m.isNull();
+				 m = m.nextSiblingElement(QStringLiteral("member")))
 				group.layers << m.attribute(QStringLiteral("name"));
-			if (!group.name.isEmpty()) set.groups << group;
+			if (! group.name.isEmpty()) set.groups << group;
 		}
 		return set;
 	}
 
-	QString layerOf(const QGraphicsItem *item)
+	QString layerOf(const QGraphicsItem* item)
 	{
 		return item ? item->data(LayerKey).toString() : QString();
 	}
 
-	void setLayerOf(QGraphicsItem *item, const QString &layer)
+	void setLayerOf(QGraphicsItem* item, const QString& layer)
 	{
-		if (!item) return;
+		if (! item) return;
 		item->setData(LayerKey, layer.isEmpty() ? QVariant() : QVariant(layer));
 	}
 
-	void writeAttribute(const QGraphicsItem *item, QDomElement &element)
+	void writeAttribute(const QGraphicsItem* item, QDomElement& element)
 	{
 		const QString layer = layerOf(item);
-		if (!layer.isEmpty()) element.setAttribute(QStringLiteral("layer"), layer);
+		if (! layer.isEmpty())
+			element.setAttribute(QStringLiteral("layer"), layer);
 	}
 
-	void readAttribute(QGraphicsItem *item, const QDomElement &element)
+	void readAttribute(QGraphicsItem* item, const QDomElement& element)
 	{
 		setLayerOf(item, element.attribute(QStringLiteral("layer")));
 	}
 
-	bool canBeOnLayer(const QGraphicsItem *item)
+	bool canBeOnLayer(const QGraphicsItem* item)
 	{
-			//A structure box is a shape with a type of its own
-		return qgraphicsitem_cast<const QetShapeItem *>(item)
-				|| qgraphicsitem_cast<const StructureBoxItem *>(item)
-				|| qgraphicsitem_cast<const IndependentTextItem *>(item)
-				|| qgraphicsitem_cast<const DiagramImageItem *>(item);
+		// A structure box is a shape with a type of its own
+		return qgraphicsitem_cast<const QetShapeItem*>(item)
+			   || qgraphicsitem_cast<const StructureBoxItem*>(item)
+			   || qgraphicsitem_cast<const IndependentTextItem*>(item)
+			   || qgraphicsitem_cast<const DiagramImageItem*>(item);
 	}
 
 	/**
 		@return whether @p item is hidden by its layer, for code walking the
 		items itself (DXF export)
 	*/
-	bool isHidden(const QGraphicsItem *item)
+	bool isHidden(const QGraphicsItem* item)
 	{
-		for (const QGraphicsItem *p = item; p; p = p->parentItem()) {
-			if (!layerOf(p).isEmpty() && !p->isVisible()) return true;
+		for (const QGraphicsItem* p = item; p; p = p->parentItem())
+		{
+			if (! layerOf(p).isEmpty() && ! p->isVisible()) return true;
 			if (p->data(LayerHiddenKey).toBool()) return true;
 		}
 		return false;
@@ -425,59 +504,69 @@ namespace DrawingLayers
 		Shows or hides @p item as its layer says; through ShownKinds, so
 		that View > Show and the layers each only veto.
 	*/
-	void apply(QGraphicsItem *item, const Set &set)
+	void apply(QGraphicsItem* item, const Set& set)
 	{
-		if (!canBeOnLayer(item)) return;
+		if (! canBeOnLayer(item)) return;
 		const QString layer = layerOf(item);
 		ShownKinds::setVisible(item, set.isVisible(layer));
 		const bool locked = set.isLocked(layer);
-		item->setFlag(QGraphicsItem::ItemIsMovable, !locked);
-		item->setFlag(QGraphicsItem::ItemIsSelectable, !locked);
-		if (locked && item->isSelected()) {
-			item->setSelected(false);
-		}
+		item->setFlag(QGraphicsItem::ItemIsMovable, ! locked);
+		item->setFlag(QGraphicsItem::ItemIsSelectable, ! locked);
+		if (locked && item->isSelected()) { item->setSelected(false); }
 	}
 
-	void applyTo(Diagram *folio, const Set &set)
+	void applyTo(Diagram* folio, const Set& set)
 	{
-		if (!folio) return;
+		if (! folio) return;
 
 		const bool show_frame = set.isVisible(FixedKind::FrameAndTitleBlock);
-		if (folio->useBorder() != show_frame) {
+		if (folio->useBorder() != show_frame)
+		{
 			folio->setUseBorder(show_frame);
 			folio->update();
 		}
 
-		const bool show_wires = set.isVisible(FixedKind::WireNumbers);
+		const bool show_wires	= set.isVisible(FixedKind::WireNumbers);
 		const bool show_symbols = set.isVisible(FixedKind::SymbolTexts);
-		const bool show_xrefs = set.isVisible(FixedKind::CrossReferences);
+		const bool show_xrefs	= set.isVisible(FixedKind::CrossReferences);
 
-		const bool lock_wires = set.isLocked(FixedKind::WireNumbers);
+		const bool lock_wires	= set.isLocked(FixedKind::WireNumbers);
 		const bool lock_symbols = set.isLocked(FixedKind::SymbolTexts);
-		const bool lock_xrefs = set.isLocked(FixedKind::CrossReferences);
+		const bool lock_xrefs	= set.isLocked(FixedKind::CrossReferences);
 
-		for (QGraphicsItem *item : folio->items()) {
-			if (canBeOnLayer(item)) {
+		for (QGraphicsItem* item : folio->items())
+		{
+			if (canBeOnLayer(item))
+			{
 				apply(item, set);
 				continue;
 			}
 			const QVariant val = item->data(ShownKinds::data_key);
-			if (!val.isValid()) continue;
+			if (! val.isValid()) continue;
 			const int kind = val.toInt();
-			if (kind == ShownKinds::WireNumbers) {
+			if (kind == ShownKinds::WireNumbers)
+			{
 				applyFixedKindItem(item, show_wires, ShownKinds::WireNumbers);
-				item->setFlag(QGraphicsItem::ItemIsMovable, !lock_wires);
-				item->setFlag(QGraphicsItem::ItemIsSelectable, !lock_wires);
+				item->setFlag(QGraphicsItem::ItemIsMovable, ! lock_wires);
+				item->setFlag(QGraphicsItem::ItemIsSelectable, ! lock_wires);
 				if (lock_wires && item->isSelected()) item->setSelected(false);
-			} else if (kind == ShownKinds::SymbolTexts) {
+			}
+			else if (kind == ShownKinds::SymbolTexts)
+			{
 				applyFixedKindItem(item, show_symbols, ShownKinds::SymbolTexts);
-				item->setFlag(QGraphicsItem::ItemIsMovable, !lock_symbols);
-				item->setFlag(QGraphicsItem::ItemIsSelectable, !lock_symbols);
-				if (lock_symbols && item->isSelected()) item->setSelected(false);
-			} else if (kind == ShownKinds::CrossReferences) {
-				applyFixedKindItem(item, show_xrefs, ShownKinds::CrossReferences);
-				item->setFlag(QGraphicsItem::ItemIsMovable, !lock_xrefs);
-				item->setFlag(QGraphicsItem::ItemIsSelectable, !lock_xrefs);
+				item->setFlag(QGraphicsItem::ItemIsMovable, ! lock_symbols);
+				item->setFlag(QGraphicsItem::ItemIsSelectable, ! lock_symbols);
+				if (lock_symbols && item->isSelected())
+					item->setSelected(false);
+			}
+			else if (kind == ShownKinds::CrossReferences)
+			{
+				applyFixedKindItem(
+					item,
+					show_xrefs,
+					ShownKinds::CrossReferences);
+				item->setFlag(QGraphicsItem::ItemIsMovable, ! lock_xrefs);
+				item->setFlag(QGraphicsItem::ItemIsSelectable, ! lock_xrefs);
 				if (lock_xrefs && item->isSelected()) item->setSelected(false);
 			}
 		}
@@ -485,9 +574,12 @@ namespace DrawingLayers
 
 	namespace
 	{
-		QString escapeCsvField(const QString &field, QChar delimiter)
+		QString escapeCsvField(const QString& field, QChar delimiter)
 		{
-			if (field.contains(delimiter) || field.contains(QLatin1Char('"')) || field.contains(QLatin1Char('\n')) || field.contains(QLatin1Char('\r'))) {
+			if (field.contains(delimiter) || field.contains(QLatin1Char('"'))
+				|| field.contains(QLatin1Char('\n'))
+				|| field.contains(QLatin1Char('\r')))
+			{
 				QString escaped = field;
 				escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
 				return QStringLiteral("\"%1\"").arg(escaped);
@@ -495,24 +587,34 @@ namespace DrawingLayers
 			return field;
 		}
 
-		QStringList parseCsvLine(const QString &line, QChar delimiter)
+		QStringList parseCsvLine(const QString& line, QChar delimiter)
 		{
 			QStringList fields;
-			QString current;
-			bool in_quotes = false;
-			for (int i = 0 ; i < line.length() ; ++i) {
+			QString		current;
+			bool		in_quotes = false;
+			for (int i = 0; i < line.length(); ++i)
+			{
 				const QChar c = line.at(i);
-				if (c == QLatin1Char('"')) {
-					if (in_quotes && i + 1 < line.length() && line.at(i + 1) == QLatin1Char('"')) {
+				if (c == QLatin1Char('"'))
+				{
+					if (in_quotes && i + 1 < line.length()
+						&& line.at(i + 1) == QLatin1Char('"'))
+					{
 						current += QLatin1Char('"');
 						++i;
-					} else {
-						in_quotes = !in_quotes;
 					}
-				} else if (c == delimiter && !in_quotes) {
+					else
+					{
+						in_quotes = ! in_quotes;
+					}
+				}
+				else if (c == delimiter && ! in_quotes)
+				{
 					fields.append(current.trimmed());
 					current.clear();
-				} else {
+				}
+				else
+				{
 					current += c;
 				}
 			}
@@ -520,84 +622,127 @@ namespace DrawingLayers
 			return fields;
 		}
 
-		bool parseBoolValue(const QString &val, bool default_val = true)
+		bool parseBoolValue(const QString& val, bool default_val = true)
 		{
 			const QString s = val.trimmed().toLower();
 			if (s.isEmpty()) return default_val;
-			if (s == QLatin1String("true") || s == QLatin1String("1") || s == QLatin1String("yes") ||
-			    s == QLatin1String("ja") || s == QLatin1String("[v]") || s == QLatin1String("[x]") ||
-			    s == QLatin1String("v") || s == QLatin1String("x") || s == QLatin1String("on")) {
+			if (s == QLatin1String("true") || s == QLatin1String("1")
+				|| s == QLatin1String("yes") || s == QLatin1String("ja")
+				|| s == QLatin1String("[v]") || s == QLatin1String("[x]")
+				|| s == QLatin1String("v") || s == QLatin1String("x")
+				|| s == QLatin1String("on"))
+			{
 				return true;
 			}
-			if (s == QLatin1String("false") || s == QLatin1String("0") || s == QLatin1String("no") ||
-			    s == QLatin1String("nein") || s == QLatin1String("[ ]") || s == QLatin1String("[]") ||
-			    s == QLatin1String("off")) {
+			if (s == QLatin1String("false") || s == QLatin1String("0")
+				|| s == QLatin1String("no") || s == QLatin1String("nein")
+				|| s == QLatin1String("[ ]") || s == QLatin1String("[]")
+				|| s == QLatin1String("off"))
+			{
 				return false;
 			}
 			return default_val;
 		}
-	}
+	} // namespace
 
-	QString exportToCsv(const Set &set)
+	QString exportToCsv(const Set& set)
 	{
 		QString result;
 		result += QStringLiteral("Name,Description,Visible,Printable,Locked\n");
-		for (const Layer &layer : set.layers) {
+		for (const Layer& layer : set.layers)
+		{
 			QStringList fields;
 			fields << escapeCsvField(layer.name, QLatin1Char(','));
 			fields << escapeCsvField(layer.description, QLatin1Char(','));
-			fields << (layer.visible ? QStringLiteral("true") : QStringLiteral("false"));
-			fields << (layer.printable ? QStringLiteral("true") : QStringLiteral("false"));
-			fields << (layer.locked ? QStringLiteral("true") : QStringLiteral("false"));
+			fields
+				<< (layer.visible ? QStringLiteral("true") :
+									QStringLiteral("false"));
+			fields
+				<< (layer.printable ? QStringLiteral("true") :
+									  QStringLiteral("false"));
+			fields
+				<< (layer.locked ? QStringLiteral("true") :
+								   QStringLiteral("false"));
 			result += fields.join(QLatin1Char(',')) + QLatin1Char('\n');
 		}
 		return result;
 	}
 
-	bool importFromCsv(Set &set, const QString &csv_content, int *imported_count)
+	bool
+	importFromCsv(Set& set, const QString& csv_content, int* imported_count)
 	{
 		if (imported_count) *imported_count = 0;
-		const QStringList lines = csv_content.split(QRegularExpression(QStringLiteral("\r\n|\n|\r")));
+		const QStringList lines =
+			csv_content.split(QRegularExpression(QStringLiteral("\r\n|\n|\r")));
 		if (lines.isEmpty()) return false;
 
 		// Detect delimiter
-		QChar delimiter = QLatin1Char(',');
+		QChar		  delimiter	 = QLatin1Char(',');
 		const QString first_line = lines.first();
-		if (first_line.contains(QLatin1Char('\t'))) delimiter = QLatin1Char('\t');
-		else if (first_line.contains(QLatin1Char(';'))) delimiter = QLatin1Char(';');
+		if (first_line.contains(QLatin1Char('\t')))
+			delimiter = QLatin1Char('\t');
+		else if (first_line.contains(QLatin1Char(';')))
+			delimiter = QLatin1Char(';');
 
-		int name_col = -1, desc_col = -1, visible_col = -1, print_col = -1, lock_col = -1;
+		int name_col = -1, desc_col = -1, visible_col = -1, print_col = -1,
+			lock_col   = -1;
 		int start_line = 0;
 
 		const QStringList header_fields = parseCsvLine(first_line, delimiter);
-		for (int i = 0 ; i < header_fields.size() ; ++i) {
+		for (int i = 0; i < header_fields.size(); ++i)
+		{
 			const QString h = header_fields.at(i).toLower();
-			if (name_col < 0 && (h == QLatin1String("name") || h == QLatin1String("ebene") || h == QLatin1String("layer"))) {
+			if (name_col < 0
+				&& (h == QLatin1String("name") || h == QLatin1String("ebene")
+					|| h == QLatin1String("layer")))
+			{
 				name_col = i;
-			} else if (desc_col < 0 && (h.contains(QLatin1String("beschreib")) || h.contains(QLatin1String("desc")))) {
+			}
+			else if (
+				desc_col < 0
+				&& (h.contains(QLatin1String("beschreib"))
+					|| h.contains(QLatin1String("desc"))))
+			{
 				desc_col = i;
-			} else if (visible_col < 0 && (h.contains(QLatin1String("sichtbar")) || h.contains(QLatin1String("visible")) || h.contains(QLatin1String("shown")))) {
+			}
+			else if (
+				visible_col < 0
+				&& (h.contains(QLatin1String("sichtbar"))
+					|| h.contains(QLatin1String("visible"))
+					|| h.contains(QLatin1String("shown"))))
+			{
 				visible_col = i;
-			} else if (print_col < 0 && (h.contains(QLatin1String("druck")) || h.contains(QLatin1String("print")))) {
+			}
+			else if (
+				print_col < 0
+				&& (h.contains(QLatin1String("druck"))
+					|| h.contains(QLatin1String("print"))))
+			{
 				print_col = i;
-			} else if (lock_col < 0 && (h.contains(QLatin1String("sperr")) || h.contains(QLatin1String("lock")))) {
+			}
+			else if (
+				lock_col < 0
+				&& (h.contains(QLatin1String("sperr"))
+					|| h.contains(QLatin1String("lock"))))
+			{
 				lock_col = i;
 			}
 		}
 
-		if (name_col >= 0) {
-			start_line = 1;
-		} else {
+		if (name_col >= 0) { start_line = 1; }
+		else
+		{
 			// No recognized header row: assume default column order
-			name_col = 0;
-			desc_col = 1;
+			name_col	= 0;
+			desc_col	= 1;
 			visible_col = 2;
-			print_col = 3;
-			lock_col = 4;
+			print_col	= 3;
+			lock_col	= 4;
 		}
 
 		int count = 0;
-		for (int l = start_line ; l < lines.size() ; ++l) {
+		for (int l = start_line; l < lines.size(); ++l)
+		{
 			const QString line = lines.at(l).trimmed();
 			if (line.isEmpty()) continue;
 			const QStringList fields = parseCsvLine(line, delimiter);
@@ -606,24 +751,38 @@ namespace DrawingLayers
 			const QString name = fields.at(name_col).trimmed();
 			if (name.isEmpty()) continue;
 
-			const QString desc = (desc_col >= 0 && desc_col < fields.size()) ? fields.at(desc_col).trimmed() : QString();
-			const bool visible = (visible_col >= 0 && visible_col < fields.size()) ? parseBoolValue(fields.at(visible_col), true) : true;
-			const bool printable = (print_col >= 0 && print_col < fields.size()) ? parseBoolValue(fields.at(print_col), true) : true;
-			const bool locked = (lock_col >= 0 && lock_col < fields.size()) ? parseBoolValue(fields.at(lock_col), false) : false;
+			const QString desc = (desc_col >= 0 && desc_col < fields.size()) ?
+									 fields.at(desc_col).trimmed() :
+									 QString();
+			const bool	  visible =
+				   (visible_col >= 0 && visible_col < fields.size()) ?
+					   parseBoolValue(fields.at(visible_col), true) :
+					   true;
+			const bool printable =
+				(print_col >= 0 && print_col < fields.size()) ?
+					parseBoolValue(fields.at(print_col), true) :
+					true;
+			const bool locked = (lock_col >= 0 && lock_col < fields.size()) ?
+									parseBoolValue(fields.at(lock_col), false) :
+									false;
 
-			const FixedKind fk = fixedKindOf(name);
-			bool found = false;
-			for (Layer &existing : set.layers) {
-				if ((fk != FixedKind::None && existing.fixed_kind == fk) || existing.name == name) {
-					if (!desc.isEmpty()) existing.description = desc;
-					existing.visible = visible;
+			const FixedKind fk	  = fixedKindOf(name);
+			bool			found = false;
+			for (Layer& existing : set.layers)
+			{
+				if ((fk != FixedKind::None && existing.fixed_kind == fk)
+					|| existing.name == name)
+				{
+					if (! desc.isEmpty()) existing.description = desc;
+					existing.visible   = visible;
 					existing.printable = printable;
-					existing.locked = locked;
-					found = true;
+					existing.locked	   = locked;
+					found			   = true;
 					break;
 				}
 			}
-			if (!found) {
+			if (! found)
+			{
 				set.layers.append({name, desc, visible, printable, locked, fk});
 			}
 			++count;
@@ -632,60 +791,68 @@ namespace DrawingLayers
 		return count > 0;
 	}
 
-	QByteArray exportToXml(const Set &set)
+	QByteArray exportToXml(const Set& set)
 	{
 		QDomDocument doc;
 		doc.appendChild(set.toXml(doc));
 		return doc.toByteArray(4);
 	}
 
-	bool importFromXml(Set &set, const QByteArray &xml_content, int *imported_count)
+	bool
+	importFromXml(Set& set, const QByteArray& xml_content, int* imported_count)
 	{
 		if (imported_count) *imported_count = 0;
 		QDomDocument doc;
-		if (!doc.setContent(xml_content)) return false;
+		if (! doc.setContent(xml_content)) return false;
 
 		QDomElement layers_elem = doc.documentElement();
-		if (layers_elem.tagName() != QLatin1String("layers")) {
-			layers_elem = layers_elem.firstChildElement(QStringLiteral("layers"));
+		if (layers_elem.tagName() != QLatin1String("layers"))
+		{
+			layers_elem =
+				layers_elem.firstChildElement(QStringLiteral("layers"));
 		}
 		if (layers_elem.isNull()) return false;
 
 		const Set imported_set = Set::fromXml(layers_elem);
-		int count = 0;
-		for (const Layer &imported_layer : imported_set.layers) {
+		int		  count		   = 0;
+		for (const Layer& imported_layer : imported_set.layers)
+		{
 			bool found = false;
-			for (Layer &existing : set.layers) {
-				if ((imported_layer.isFixed() && existing.fixed_kind == imported_layer.fixed_kind) || existing.name == imported_layer.name) {
-					if (!imported_layer.description.isEmpty()) existing.description = imported_layer.description;
-					existing.visible = imported_layer.visible;
+			for (Layer& existing : set.layers)
+			{
+				if ((imported_layer.isFixed()
+					 && existing.fixed_kind == imported_layer.fixed_kind)
+					|| existing.name == imported_layer.name)
+				{
+					if (! imported_layer.description.isEmpty())
+						existing.description = imported_layer.description;
+					existing.visible   = imported_layer.visible;
 					existing.printable = imported_layer.printable;
-					existing.locked = imported_layer.locked;
-					found = true;
+					existing.locked	   = imported_layer.locked;
+					found			   = true;
 					break;
 				}
 			}
-			if (!found) {
-				set.layers.append(imported_layer);
-			}
+			if (! found) { set.layers.append(imported_layer); }
 			++count;
 		}
 
-		for (const Group &group : imported_set.groups) {
+		for (const Group& group : imported_set.groups)
+		{
 			bool found = false;
-			for (Group &existing_group : set.groups) {
-				if (existing_group.name == group.name) {
+			for (Group& existing_group : set.groups)
+			{
+				if (existing_group.name == group.name)
+				{
 					existing_group.layers = group.layers;
-					found = true;
+					found				  = true;
 					break;
 				}
 			}
-			if (!found) {
-				set.groups.append(group);
-			}
+			if (! found) { set.groups.append(group); }
 		}
 
 		if (imported_count) *imported_count = count;
 		return count > 0;
 	}
-}
+} // namespace DrawingLayers
