@@ -131,10 +131,10 @@ namespace DrawingLayers
 	QList<Layer> defaultFixedLayers()
 	{
 		return {
-			{fixedKindName(FixedKind::FrameAndTitleBlock), true, FixedKind::FrameAndTitleBlock},
-			{fixedKindName(FixedKind::WireNumbers),        true, FixedKind::WireNumbers},
-			{fixedKindName(FixedKind::SymbolTexts),        true, FixedKind::SymbolTexts},
-			{fixedKindName(FixedKind::CrossReferences),    true, FixedKind::CrossReferences}
+			{fixedKindName(FixedKind::FrameAndTitleBlock), QString(), true, true, false, FixedKind::FrameAndTitleBlock},
+			{fixedKindName(FixedKind::WireNumbers),        QString(), true, true, false, FixedKind::WireNumbers},
+			{fixedKindName(FixedKind::SymbolTexts),        QString(), true, true, false, FixedKind::SymbolTexts},
+			{fixedKindName(FixedKind::CrossReferences),    QString(), true, true, false, FixedKind::CrossReferences}
 		};
 	}
 
@@ -184,7 +184,10 @@ namespace DrawingLayers
 		if (!groups.isEmpty()) return false;
 		if (!userLayers().isEmpty()) return false;
 		for (const Layer &layer : layers) {
-			if (layer.isFixed() && !layer.visible) return false;
+			if (layer.isFixed()) {
+				if (!layer.visible || !layer.printable || layer.locked || !layer.description.isEmpty())
+					return false;
+			}
 		}
 		return true;
 	}
@@ -216,6 +219,54 @@ namespace DrawingLayers
 		return true;
 	}
 
+	bool Set::isPrintable(FixedKind kind) const
+	{
+		if (kind == FixedKind::None) return true;
+		for (const Layer &layer : layers) {
+			if (layer.fixed_kind == kind || layer.name == fixedKindName(kind))
+				return layer.printable;
+		}
+		return true;
+	}
+
+	bool Set::isPrintable(const QString &name) const
+	{
+		const FixedKind fk = fixedKindOf(name);
+		if (fk != FixedKind::None) return isPrintable(fk);
+		for (const Layer &layer : layers)
+			if (layer.name == name) return layer.printable;
+		return true;
+	}
+
+	bool Set::isLocked(FixedKind kind) const
+	{
+		if (kind == FixedKind::None) return false;
+		for (const Layer &layer : layers) {
+			if (layer.fixed_kind == kind || layer.name == fixedKindName(kind))
+				return layer.locked;
+		}
+		return false;
+	}
+
+	bool Set::isLocked(const QString &name) const
+	{
+		const FixedKind fk = fixedKindOf(name);
+		if (fk != FixedKind::None) return isLocked(fk);
+		for (const Layer &layer : layers)
+			if (layer.name == name) return layer.locked;
+		return false;
+	}
+
+	QString Set::description(const QString &name) const
+	{
+		const FixedKind fk = fixedKindOf(name);
+		for (const Layer &layer : layers) {
+			if (layer.name == name || (fk != FixedKind::None && layer.fixed_kind == fk))
+				return layer.description;
+		}
+		return QString();
+	}
+
 	QStringList Set::names() const
 	{
 		QStringList list;
@@ -230,13 +281,33 @@ namespace DrawingLayers
 		return set;
 	}
 
+	Set Set::forPrinting() const
+	{
+		Set set = *this;
+		for (Layer &layer : set.layers) {
+			if (!layer.printable) {
+				layer.visible = false;
+			}
+		}
+		return set;
+	}
+
 	QDomElement Set::toXml(QDomDocument &document) const
 	{
 		QDomElement root = document.createElement(QStringLiteral("layers"));
 		for (const Layer &layer : layers) {
 			QDomElement element = document.createElement(QStringLiteral("layer"));
 			element.setAttribute(QStringLiteral("name"), layer.name);
+			if (!layer.description.isEmpty()) {
+				element.setAttribute(QStringLiteral("description"), layer.description);
+			}
 			element.setAttribute(QStringLiteral("visible"), layer.visible ? QStringLiteral("true") : QStringLiteral("false"));
+			if (!layer.printable) {
+				element.setAttribute(QStringLiteral("printable"), QStringLiteral("false"));
+			}
+			if (layer.locked) {
+				element.setAttribute(QStringLiteral("locked"), QStringLiteral("true"));
+			}
 			if (layer.isFixed()) {
 				element.setAttribute(QStringLiteral("fixed"), fixedKindAttribute(layer.fixed_kind));
 			}
@@ -264,7 +335,11 @@ namespace DrawingLayers
 			 ; e = e.nextSiblingElement(QStringLiteral("layer"))) {
 			const QString name = e.attribute(QStringLiteral("name")).trimmed();
 			if (name.isEmpty()) continue;
+			const QString desc = e.attribute(QStringLiteral("description"));
 			const bool visible = (e.attribute(QStringLiteral("visible")) != QLatin1String("false"));
+			const bool printable = (e.attribute(QStringLiteral("printable")) != QLatin1String("false"));
+			const bool locked = (e.attribute(QStringLiteral("locked")) == QLatin1String("true"));
+
 			FixedKind fk = FixedKind::None;
 			if (e.hasAttribute(QStringLiteral("fixed"))) {
 				fk = fixedKindFromAttribute(e.attribute(QStringLiteral("fixed")));
@@ -275,14 +350,17 @@ namespace DrawingLayers
 			bool found = false;
 			for (Layer &l : set.layers) {
 				if ((fk != FixedKind::None && l.fixed_kind == fk) || l.name == name) {
+					l.description = desc;
 					l.visible = visible;
+					l.printable = printable;
+					l.locked = locked;
 					l.fixed_kind = fk;
 					found = true;
 					break;
 				}
 			}
 			if (!found) {
-				set.layers.append({name, visible, fk});
+				set.layers.append({name, desc, visible, printable, locked, fk});
 			}
 		}
 		set.groups.clear();
@@ -350,7 +428,14 @@ namespace DrawingLayers
 	void apply(QGraphicsItem *item, const Set &set)
 	{
 		if (!canBeOnLayer(item)) return;
-		ShownKinds::setVisible(item, set.isVisible(layerOf(item)));
+		const QString layer = layerOf(item);
+		ShownKinds::setVisible(item, set.isVisible(layer));
+		const bool locked = set.isLocked(layer);
+		item->setFlag(QGraphicsItem::ItemIsMovable, !locked);
+		item->setFlag(QGraphicsItem::ItemIsSelectable, !locked);
+		if (locked && item->isSelected()) {
+			item->setSelected(false);
+		}
 	}
 
 	void applyTo(Diagram *folio, const Set &set)
@@ -367,6 +452,10 @@ namespace DrawingLayers
 		const bool show_symbols = set.isVisible(FixedKind::SymbolTexts);
 		const bool show_xrefs = set.isVisible(FixedKind::CrossReferences);
 
+		const bool lock_wires = set.isLocked(FixedKind::WireNumbers);
+		const bool lock_symbols = set.isLocked(FixedKind::SymbolTexts);
+		const bool lock_xrefs = set.isLocked(FixedKind::CrossReferences);
+
 		for (QGraphicsItem *item : folio->items()) {
 			if (canBeOnLayer(item)) {
 				apply(item, set);
@@ -377,10 +466,19 @@ namespace DrawingLayers
 			const int kind = val.toInt();
 			if (kind == ShownKinds::WireNumbers) {
 				applyFixedKindItem(item, show_wires, ShownKinds::WireNumbers);
+				item->setFlag(QGraphicsItem::ItemIsMovable, !lock_wires);
+				item->setFlag(QGraphicsItem::ItemIsSelectable, !lock_wires);
+				if (lock_wires && item->isSelected()) item->setSelected(false);
 			} else if (kind == ShownKinds::SymbolTexts) {
 				applyFixedKindItem(item, show_symbols, ShownKinds::SymbolTexts);
+				item->setFlag(QGraphicsItem::ItemIsMovable, !lock_symbols);
+				item->setFlag(QGraphicsItem::ItemIsSelectable, !lock_symbols);
+				if (lock_symbols && item->isSelected()) item->setSelected(false);
 			} else if (kind == ShownKinds::CrossReferences) {
 				applyFixedKindItem(item, show_xrefs, ShownKinds::CrossReferences);
+				item->setFlag(QGraphicsItem::ItemIsMovable, !lock_xrefs);
+				item->setFlag(QGraphicsItem::ItemIsSelectable, !lock_xrefs);
+				if (lock_xrefs && item->isSelected()) item->setSelected(false);
 			}
 		}
 	}

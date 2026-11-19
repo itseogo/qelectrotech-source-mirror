@@ -27,6 +27,8 @@ class QETProject;
 class QListWidget;
 class QTableWidget;
 
+class QLineEdit;
+
 /**
 	@brief The LayersDialog class
 	Project > Layers...: the project's layers of free drawing, each on or
@@ -41,15 +43,19 @@ class LayersDialog : public QDialog
 
 	public slots:
 		void refresh();
-		bool addLayer(const QString &name);
+		bool addLayer(const QString &name, const QString &description = QString());
 		bool renameLayer(const QString &name, const QString &new_name);
 		void removeLayer(const QString &name);
 		void setLayerVisible(const QString &name, bool visible);
+		void setLayerPrintable(const QString &name, bool printable);
+		void setLayerLocked(const QString &name, bool locked);
+		void setLayerDescription(const QString &name, const QString &description);
 		int putSelectionOnLayer(const QString &layer, Diagram *folio = nullptr);
 		bool addGroup(const QString &name);
 		void removeGroup(const QString &name);
 		void setGroupLayers(const QString &name, const QStringList &layers);
 		void showGroup(const QString &name);
+		void filterLayers(const QString &filter_text);
 
 	private slots:
 		void updateButtonStates();
@@ -61,6 +67,7 @@ class LayersDialog : public QDialog
 		void buildFolios();
 
 		QPointer<QETProject> m_project;
+		QLineEdit *m_filter_edit = nullptr;
 		QTableWidget *m_layers;
 		QListWidget *m_groups;
 		QListWidget *m_members;

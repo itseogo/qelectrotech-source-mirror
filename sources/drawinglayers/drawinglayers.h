@@ -18,10 +18,10 @@
 #ifndef DRAWINGLAYERS_H
 #define DRAWINGLAYERS_H
 
+#include <QDomElement>
 #include <QList>
 #include <QString>
 #include <QStringList>
-#include <QDomElement>
 
 class Diagram;
 class QGraphicsItem;
@@ -33,8 +33,9 @@ class QGraphicsItem;
 	print and in exports. Symbols and wires are never on a user layer, so hiding
 	one cannot change wiring, numbering or lists.
 
-	Built-in fixed layers control fixed kinds (frame and title block, wire numbers,
-	symbol texts, cross-references) across the project and in layer groups.
+	Built-in fixed layers control fixed kinds (frame and title block, wire
+   numbers, symbol texts, cross-references) across the project and in layer
+   groups.
 
 	A layer group is a named set of layers to show together: the layers
 	of a group on, the others off.
@@ -42,7 +43,8 @@ class QGraphicsItem;
 */
 namespace DrawingLayers
 {
-	enum class FixedKind {
+	enum class FixedKind
+	{
 		None = 0,
 		FrameAndTitleBlock,
 		WireNumbers,
@@ -50,30 +52,60 @@ namespace DrawingLayers
 		CrossReferences
 	};
 
-	QString fixedKindName(FixedKind kind);
-	QString fixedKindDisplayName(FixedKind kind);
-	QString fixedKindAttribute(FixedKind kind);
-	FixedKind fixedKindOf(const QString &name);
-	FixedKind fixedKindFromAttribute(const QString &attr);
-	bool isFixed(const QString &name);
+	QString	  fixedKindName(FixedKind kind);
+	QString	  fixedKindDisplayName(FixedKind kind);
+	QString	  fixedKindAttribute(FixedKind kind);
+	FixedKind fixedKindOf(const QString& name);
+	FixedKind fixedKindFromAttribute(const QString& attr);
+	bool	  isFixed(const QString& name);
 
 	struct Layer
 	{
-		QString name;
-		bool visible = true;
+		QString	  name;
+		QString	  description;
+		bool	  visible	 = true;
+		bool	  printable	 = true;
+		bool	  locked	 = false;
 		FixedKind fixed_kind = FixedKind::None;
 
-		bool isFixed() const {return fixed_kind != FixedKind::None;}
-		bool operator==(const Layer &o) const {return name == o.name && visible == o.visible && isFixed() == o.isFixed();}
+		Layer() = default;
+		Layer(const QString& n, bool v = true, FixedKind fk = FixedKind::None) :
+			name(n), visible(v), fixed_kind(fk)
+		{
+		}
+		Layer(
+			const QString& n,
+			const QString& d,
+			bool		   v  = true,
+			bool		   p  = true,
+			bool		   l  = false,
+			FixedKind	   fk = FixedKind::None) :
+			name(n),
+			description(d),
+			visible(v),
+			printable(p),
+			locked(l),
+			fixed_kind(fk)
+		{
+		}
+
+		bool isFixed() const { return fixed_kind != FixedKind::None; }
+		bool operator==(const Layer& o) const
+		{
+			return name == o.name && description == o.description
+				   && visible == o.visible && printable == o.printable
+				   && locked == o.locked && fixed_kind == o.fixed_kind;
+		}
 	};
 
 	QList<Layer> defaultFixedLayers();
 
 	struct Group
 	{
-		QString name;
+		QString		name;
 		QStringList layers;
-		bool operator==(const Group &o) const {return name == o.name && layers == o.layers;}
+		bool		operator==(const Group& o) const
+		{ return name == o.name && layers == o.layers; }
 	};
 
 	struct Set
@@ -82,32 +114,39 @@ namespace DrawingLayers
 		QList<Layer> layers;
 		QList<Group> groups;
 
-		void ensureFixedLayers();
+		void		 ensureFixedLayers();
 		QList<Layer> userLayers() const;
 		QList<Layer> fixedLayers() const;
 
 		bool isEmpty() const;
-		bool operator==(const Set &o) const {return layers == o.layers && groups == o.groups;}
-		bool operator!=(const Set &o) const {return !(*this == o);}
-		bool contains(const QString &name) const;
-		bool isVisible(const QString &name) const;
-		bool isVisible(FixedKind kind) const;
+		bool operator==(const Set& o) const
+		{ return layers == o.layers && groups == o.groups; }
+		bool		operator!=(const Set& o) const { return ! (*this == o); }
+		bool		contains(const QString& name) const;
+		bool		isVisible(const QString& name) const;
+		bool		isVisible(FixedKind kind) const;
+		bool		isPrintable(const QString& name) const;
+		bool		isPrintable(FixedKind kind) const;
+		bool		isLocked(const QString& name) const;
+		bool		isLocked(FixedKind kind) const;
+		QString		description(const QString& name) const;
 		QStringList names() const;
-		Set showing(const Group &group) const;
+		Set			showing(const Group& group) const;
+		Set			forPrinting() const;
 
-		QDomElement toXml(QDomDocument &document) const;
-		static Set fromXml(const QDomElement &element);
+		QDomElement toXml(QDomDocument& document) const;
+		static Set	fromXml(const QDomElement& element);
 	};
 
-	QString layerOf(const QGraphicsItem *item);
-	void setLayerOf(QGraphicsItem *item, const QString &layer);
-	void writeAttribute(const QGraphicsItem *item, QDomElement &element);
-	void readAttribute(QGraphicsItem *item, const QDomElement &element);
+	QString layerOf(const QGraphicsItem* item);
+	void	setLayerOf(QGraphicsItem* item, const QString& layer);
+	void	writeAttribute(const QGraphicsItem* item, QDomElement& element);
+	void	readAttribute(QGraphicsItem* item, const QDomElement& element);
 
-	bool canBeOnLayer(const QGraphicsItem *item);
-	bool isHidden(const QGraphicsItem *item);
-	void apply(QGraphicsItem *item, const Set &set);
-	void applyTo(Diagram *folio, const Set &set);
-}
+	bool canBeOnLayer(const QGraphicsItem* item);
+	bool isHidden(const QGraphicsItem* item);
+	void apply(QGraphicsItem* item, const Set& set);
+	void applyTo(Diagram* folio, const Set& set);
+} // namespace DrawingLayers
 
 #endif // DRAWINGLAYERS_H

@@ -148,6 +148,15 @@ ProjectPrintWindow::ProjectPrintWindow(QETProject *project, QPrinter *printer, Q
 	}
 	ui->m_component_info_cb->setVisible(m_printer->outputFormat() == QPrinter::PdfFormat);
 	setUpLayerGroups();
+	if (m_project) {
+		const DrawingLayers::Set print_set = m_project->drawingLayers().forPrinting();
+		if (print_set != m_project->drawingLayers()) {
+			m_project->loadFolios();
+			for (Diagram *folio : m_project->folios())
+				DrawingLayers::applyTo(folio, print_set);
+			m_layers_changed = true;
+		}
+	}
 
 	auto exp = ExportProperties::defaultPrintProperties();
 	ui->m_draw_border_cb->setChecked(exp.draw_border);
@@ -201,6 +210,7 @@ void ProjectPrintWindow::setUpLayerGroups()
 		m_project->loadFolios();
 		DrawingLayers::Set set = m_project->drawingLayers();
 		if (index > 0) set = set.showing(set.groups.at(index - 1));
+		set = set.forPrinting();
 		for (Diagram *folio : m_project->folios())
 			DrawingLayers::applyTo(folio, set);
 		m_layers_changed = true;

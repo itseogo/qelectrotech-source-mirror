@@ -36,6 +36,7 @@
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
 #include <QTableWidget>
@@ -47,13 +48,13 @@ using DrawingLayers::Set;
 LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 	QDialog(parent),
 	m_project(project),
-	m_layers(new QTableWidget(0, 2, this)),
+	m_layers(new QTableWidget(0, 5, this)),
 	m_groups(new QListWidget(this)),
 	m_members(new QListWidget(this)),
 	m_summary(new QLabel(this))
 {
 	setWindowTitle(tr("Layers"));
-	resize(620, 520);
+	resize(720, 540);
 	auto *layout = new QVBoxLayout(this);
 	m_summary->setWordWrap(true);
 	m_summary->setObjectName(QStringLiteral("layersSummary"));
@@ -63,15 +64,31 @@ LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 
 	auto *layers_box = new QGroupBox(tr("Layers"), this);
 	auto *layers_layout = new QHBoxLayout(layers_box);
+	auto *layers_vbox = new QVBoxLayout();
+
+	auto *filter_layout = new QHBoxLayout();
+	auto *filter_label = new QLabel(tr("Filter:"), this);
+	m_filter_edit = new QLineEdit(this);
+	m_filter_edit->setObjectName(QStringLiteral("layerFilterEdit"));
+	m_filter_edit->setPlaceholderText(tr("Search by name or description..."));
+	m_filter_edit->setClearButtonEnabled(true);
+	filter_layout->addWidget(filter_label);
+	filter_layout->addWidget(m_filter_edit);
+	layers_vbox->addLayout(filter_layout);
+
 	m_layers->setObjectName(QStringLiteral("layersTable"));
-	m_layers->setHorizontalHeaderLabels({tr("Shown"), tr("Name")});
+	m_layers->setHorizontalHeaderLabels({tr("Name"), tr("Description"), tr("Shown"), tr("Print"), tr("Locked")});
 	m_layers->verticalHeader()->setVisible(false);
 	m_layers->setSelectionBehavior(QAbstractItemView::SelectRows);
 	m_layers->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_layers->setEditTriggers(QAbstractItemView::NoEditTriggers);
 	m_layers->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	m_layers->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-	layers_layout->addWidget(m_layers, 1);
+	m_layers->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+	m_layers->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+	m_layers->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
+	layers_vbox->addWidget(m_layers, 1);
+	layers_layout->addLayout(layers_vbox, 1);
+
 	auto *layer_buttons = new QVBoxLayout();
 	const auto button = [this](QVBoxLayout *column, const QString &text, const char *name) {
 		auto *b = new QPushButton(text, this);
@@ -107,6 +124,8 @@ LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 	connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 	layout->addWidget(buttons);
 
+	connect(m_filter_edit, &QLineEdit::textChanged, this, &LayersDialog::filterLayers);
+
 	connect(add, &QPushButton::clicked, this, [this]() {
 		const QString name = QInputDialog::getText(this, tr("Add a layer"), tr("Name of the layer:"));
 		if (!name.trimmed().isEmpty() && !addLayer(name.trimmed()))
@@ -129,12 +148,21 @@ LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 	connect(m_take_btn, &QPushButton::clicked, this, [this]() {putSelectionOnLayer(QString());});
 	connect(m_layers, &QTableWidget::itemSelectionChanged, this, &LayersDialog::updateButtonStates);
 	connect(m_layers, &QTableWidget::itemChanged, this, [this](QTableWidgetItem *item) {
-		if (m_refreshing || item->column() != 0) return;
-		auto *name_item = m_layers->item(item->row(), 1);
+		if (m_refreshing) return;
+		auto *name_item = m_layers->item(item->row(), 0);
 		if (!name_item) return;
 		const QVariant data = name_item->data(Qt::UserRole);
 		const QString layer_name = data.isValid() ? data.toString() : name_item->text();
-		setLayerVisible(layer_name, item->checkState() == Qt::Checked);
+
+		if (item->column() == 1) {
+			setLayerDescription(layer_name, item->text().trimmed());
+		} else if (item->column() == 2) {
+			setLayerVisible(layer_name, item->checkState() == Qt::Checked);
+		} else if (item->column() == 3) {
+			setLayerPrintable(layer_name, item->checkState() == Qt::Checked);
+		} else if (item->column() == 4) {
+			setLayerLocked(layer_name, item->checkState() == Qt::Checked);
+		}
 	});
 	connect(add_group, &QPushButton::clicked, this, [this]() {
 		const QString name = QInputDialog::getText(this, tr("Add a layer group"), tr("Name of the group:"));
@@ -191,12 +219,29 @@ void LayersDialog::updateButtonStates()
 	if (m_put_btn) m_put_btn->setEnabled(has_selection && !fixed);
 }
 
+void LayersDialog::filterLayers(const QString &filter_text)
+{
+	const QString text = filter_text.trimmed();
+	for (int row = 0 ; row < m_layers->rowCount() ; ++row) {
+		if (text.isEmpty()) {
+			m_layers->setRowHidden(row, false);
+			continue;
+		}
+		auto *name_item = m_layers->item(row, 0);
+		auto *desc_item = m_layers->item(row, 1);
+		const QString name = name_item ? name_item->text() : QString();
+		const QString desc = desc_item ? desc_item->text() : QString();
+		const bool match = name.contains(text, Qt::CaseInsensitive) || desc.contains(text, Qt::CaseInsensitive);
+		m_layers->setRowHidden(row, !match);
+	}
+}
+
 QString LayersDialog::currentLayer() const
 {
 	const int row = m_layers->currentRow();
-	if (row < 0 || !m_layers->item(row, 1)) return QString();
-	const QVariant data = m_layers->item(row, 1)->data(Qt::UserRole);
-	return data.isValid() ? data.toString() : m_layers->item(row, 1)->text();
+	if (row < 0 || !m_layers->item(row, 0)) return QString();
+	const QVariant data = m_layers->item(row, 0)->data(Qt::UserRole);
+	return data.isValid() ? data.toString() : m_layers->item(row, 0)->text();
 }
 
 QString LayersDialog::currentGroup() const
@@ -213,16 +258,38 @@ void LayersDialog::refresh()
 	m_layers->setRowCount(int(set.layers.size()));
 	for (int row = 0 ; row < set.layers.size() ; ++row) {
 		const auto &l = set.layers.at(row);
-		auto *shown = new QTableWidgetItem();
-		shown->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
-		shown->setCheckState(l.visible ? Qt::Checked : Qt::Unchecked);
-		m_layers->setItem(row, 0, shown);
 
+		// Col 0: Name
 		const QString display_name = l.isFixed() ? DrawingLayers::fixedKindDisplayName(l.fixed_kind) : l.name;
 		auto *name_item = new QTableWidgetItem(display_name);
 		name_item->setData(Qt::UserRole, l.name);
-		m_layers->setItem(row, 1, name_item);
-		if (l.name == layer) m_layers->setCurrentCell(row, 1);
+		name_item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+		m_layers->setItem(row, 0, name_item);
+
+		// Col 1: Description
+		auto *desc_item = new QTableWidgetItem(l.description);
+		desc_item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable);
+		m_layers->setItem(row, 1, desc_item);
+
+		// Col 2: Shown
+		auto *shown = new QTableWidgetItem();
+		shown->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
+		shown->setCheckState(l.visible ? Qt::Checked : Qt::Unchecked);
+		m_layers->setItem(row, 2, shown);
+
+		// Col 3: Print
+		auto *printable = new QTableWidgetItem();
+		printable->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
+		printable->setCheckState(l.printable ? Qt::Checked : Qt::Unchecked);
+		m_layers->setItem(row, 3, printable);
+
+		// Col 4: Locked
+		auto *locked = new QTableWidgetItem();
+		locked->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
+		locked->setCheckState(l.locked ? Qt::Checked : Qt::Unchecked);
+		m_layers->setItem(row, 4, locked);
+
+		if (l.name == layer) m_layers->setCurrentCell(row, 0);
 	}
 	m_groups->clear();
 	for (const auto &g : set.groups) {
@@ -232,6 +299,9 @@ void LayersDialog::refresh()
 	m_refreshing = false;
 	showGroupMembers();
 	updateButtonStates();
+	if (m_filter_edit && !m_filter_edit->text().isEmpty()) {
+		filterLayers(m_filter_edit->text());
+	}
 }
 
 void LayersDialog::showGroupMembers()
@@ -257,11 +327,11 @@ void LayersDialog::showGroupMembers()
 	m_refreshing = false;
 }
 
-bool LayersDialog::addLayer(const QString &name)
+bool LayersDialog::addLayer(const QString &name, const QString &description)
 {
 	if (!m_project || name.isEmpty() || DrawingLayers::isFixed(name) || m_project->drawingLayers().contains(name)) return false;
 	Set set = m_project->drawingLayers();
-	set.layers.append({name, true, DrawingLayers::FixedKind::None});
+	set.layers.append({name, description, true, true, false, DrawingLayers::FixedKind::None});
 	m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
 	return true;
 }
@@ -311,6 +381,36 @@ void LayersDialog::setLayerVisible(const QString &name, bool visible)
 	Set set = m_project->drawingLayers();
 	for (auto &layer : set.layers)
 		if (layer.name == name) layer.visible = visible;
+	if (set != m_project->drawingLayers())
+		m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
+}
+
+void LayersDialog::setLayerPrintable(const QString &name, bool printable)
+{
+	if (!m_project) return;
+	Set set = m_project->drawingLayers();
+	for (auto &layer : set.layers)
+		if (layer.name == name) layer.printable = printable;
+	if (set != m_project->drawingLayers())
+		m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
+}
+
+void LayersDialog::setLayerLocked(const QString &name, bool locked)
+{
+	if (!m_project) return;
+	Set set = m_project->drawingLayers();
+	for (auto &layer : set.layers)
+		if (layer.name == name) layer.locked = locked;
+	if (set != m_project->drawingLayers())
+		m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
+}
+
+void LayersDialog::setLayerDescription(const QString &name, const QString &description)
+{
+	if (!m_project) return;
+	Set set = m_project->drawingLayers();
+	for (auto &layer : set.layers)
+		if (layer.name == name) layer.description = description;
 	if (set != m_project->drawingLayers())
 		m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
 }
