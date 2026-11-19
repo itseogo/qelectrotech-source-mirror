@@ -81,10 +81,10 @@ LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 		return b;
 	};
 	auto *add = button(layer_buttons, tr("Add..."), "layerAdd");
-	auto *rename = button(layer_buttons, tr("Rename..."), "layerRename");
-	auto *remove = button(layer_buttons, tr("Remove"), "layerRemove");
-	auto *put = button(layer_buttons, tr("Put the selection on it"), "layerPut");
-	auto *take = button(layer_buttons, tr("Take the selection off"), "layerTake");
+	m_rename_btn = button(layer_buttons, tr("Rename..."), "layerRename");
+	m_remove_btn = button(layer_buttons, tr("Remove"), "layerRemove");
+	m_put_btn = button(layer_buttons, tr("Put the selection on it"), "layerPut");
+	m_take_btn = button(layer_buttons, tr("Take the selection off"), "layerTake");
 	layer_buttons->addStretch();
 	layers_layout->addLayout(layer_buttons);
 	layout->addWidget(layers_box, 1);
@@ -112,7 +112,7 @@ LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 		if (!name.trimmed().isEmpty() && !addLayer(name.trimmed()))
 			QET::QetMessageBox::warning(this, tr("Layers"), tr("There already is a layer of this name."));
 	});
-	connect(rename, &QPushButton::clicked, this, [this]() {
+	connect(m_rename_btn, &QPushButton::clicked, this, [this]() {
 		const QString current = currentLayer();
 		if (current.isEmpty()) return;
 		const QString name = QInputDialog::getText(this, tr("Rename the layer"), tr("Name of the layer:"),
@@ -120,16 +120,21 @@ LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 		if (!name.trimmed().isEmpty() && name.trimmed() != current && !renameLayer(current, name.trimmed()))
 			QET::QetMessageBox::warning(this, tr("Layers"), tr("There already is a layer of this name."));
 	});
-	connect(remove, &QPushButton::clicked, this, [this]() {
+	connect(m_remove_btn, &QPushButton::clicked, this, [this]() {
 		if (!currentLayer().isEmpty()) removeLayer(currentLayer());
 	});
-	connect(put, &QPushButton::clicked, this, [this]() {
+	connect(m_put_btn, &QPushButton::clicked, this, [this]() {
 		if (!currentLayer().isEmpty()) putSelectionOnLayer(currentLayer());
 	});
-	connect(take, &QPushButton::clicked, this, [this]() {putSelectionOnLayer(QString());});
+	connect(m_take_btn, &QPushButton::clicked, this, [this]() {putSelectionOnLayer(QString());});
+	connect(m_layers, &QTableWidget::itemSelectionChanged, this, &LayersDialog::updateButtonStates);
 	connect(m_layers, &QTableWidget::itemChanged, this, [this](QTableWidgetItem *item) {
 		if (m_refreshing || item->column() != 0) return;
-		setLayerVisible(m_layers->item(item->row(), 1)->text(), item->checkState() == Qt::Checked);
+		auto *name_item = m_layers->item(item->row(), 1);
+		if (!name_item) return;
+		const QVariant data = name_item->data(Qt::UserRole);
+		const QString layer_name = data.isValid() ? data.toString() : name_item->text();
+		setLayerVisible(layer_name, item->checkState() == Qt::Checked);
 	});
 	connect(add_group, &QPushButton::clicked, this, [this]() {
 		const QString name = QInputDialog::getText(this, tr("Add a layer group"), tr("Name of the group:"));
@@ -146,8 +151,12 @@ LayersDialog::LayersDialog(QETProject *project, QWidget *parent) :
 	connect(m_members, &QListWidget::itemChanged, this, [this]() {
 		if (m_refreshing || currentGroup().isEmpty()) return;
 		QStringList layers;
-		for (int i = 0 ; i < m_members->count() ; ++i)
-			if (m_members->item(i)->checkState() == Qt::Checked) layers << m_members->item(i)->text();
+		for (int i = 0 ; i < m_members->count() ; ++i) {
+			if (m_members->item(i)->checkState() == Qt::Checked) {
+				const QVariant data = m_members->item(i)->data(Qt::UserRole);
+				layers << (data.isValid() ? data.toString() : m_members->item(i)->text());
+			}
+		}
 		setGroupLayers(currentGroup(), layers);
 	});
 	if (project) {
@@ -171,10 +180,23 @@ void LayersDialog::buildFolios()
 	}
 }
 
+void LayersDialog::updateButtonStates()
+{
+	const QString current = currentLayer();
+	const bool has_selection = !current.isEmpty();
+	const bool fixed = DrawingLayers::isFixed(current);
+
+	if (m_rename_btn) m_rename_btn->setEnabled(has_selection && !fixed);
+	if (m_remove_btn) m_remove_btn->setEnabled(has_selection && !fixed);
+	if (m_put_btn) m_put_btn->setEnabled(has_selection && !fixed);
+}
+
 QString LayersDialog::currentLayer() const
 {
 	const int row = m_layers->currentRow();
-	return row < 0 || !m_layers->item(row, 1) ? QString() : m_layers->item(row, 1)->text();
+	if (row < 0 || !m_layers->item(row, 1)) return QString();
+	const QVariant data = m_layers->item(row, 1)->data(Qt::UserRole);
+	return data.isValid() ? data.toString() : m_layers->item(row, 1)->text();
 }
 
 QString LayersDialog::currentGroup() const
@@ -190,12 +212,17 @@ void LayersDialog::refresh()
 	const Set &set = m_project->drawingLayers();
 	m_layers->setRowCount(int(set.layers.size()));
 	for (int row = 0 ; row < set.layers.size() ; ++row) {
+		const auto &l = set.layers.at(row);
 		auto *shown = new QTableWidgetItem();
 		shown->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
-		shown->setCheckState(set.layers.at(row).visible ? Qt::Checked : Qt::Unchecked);
+		shown->setCheckState(l.visible ? Qt::Checked : Qt::Unchecked);
 		m_layers->setItem(row, 0, shown);
-		m_layers->setItem(row, 1, new QTableWidgetItem(set.layers.at(row).name));
-		if (set.layers.at(row).name == layer) m_layers->setCurrentCell(row, 1);
+
+		const QString display_name = l.isFixed() ? DrawingLayers::fixedKindDisplayName(l.fixed_kind) : l.name;
+		auto *name_item = new QTableWidgetItem(display_name);
+		name_item->setData(Qt::UserRole, l.name);
+		m_layers->setItem(row, 1, name_item);
+		if (l.name == layer) m_layers->setCurrentCell(row, 1);
 	}
 	m_groups->clear();
 	for (const auto &g : set.groups) {
@@ -204,6 +231,7 @@ void LayersDialog::refresh()
 	}
 	m_refreshing = false;
 	showGroupMembers();
+	updateButtonStates();
 }
 
 void LayersDialog::showGroupMembers()
@@ -216,10 +244,14 @@ void LayersDialog::showGroupMembers()
 		QStringList in_group;
 		for (const auto &g : m_project->drawingLayers().groups)
 			if (g.name == name) in_group = g.layers;
-		for (const QString &layer : m_project->drawingLayers().names()) {
-			auto *item = new QListWidgetItem(layer, m_members);
+		for (const auto &layer : m_project->drawingLayers().layers) {
+			const QString display_name = layer.isFixed()
+					? DrawingLayers::fixedKindDisplayName(layer.fixed_kind)
+					: layer.name;
+			auto *item = new QListWidgetItem(display_name, m_members);
+			item->setData(Qt::UserRole, layer.name);
 			item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
-			item->setCheckState(in_group.contains(layer) ? Qt::Checked : Qt::Unchecked);
+			item->setCheckState(in_group.contains(layer.name) ? Qt::Checked : Qt::Unchecked);
 		}
 	}
 	m_refreshing = false;
@@ -227,16 +259,16 @@ void LayersDialog::showGroupMembers()
 
 bool LayersDialog::addLayer(const QString &name)
 {
-	if (!m_project || name.isEmpty() || m_project->drawingLayers().contains(name)) return false;
+	if (!m_project || name.isEmpty() || DrawingLayers::isFixed(name) || m_project->drawingLayers().contains(name)) return false;
 	Set set = m_project->drawingLayers();
-	set.layers.append({name, true});
+	set.layers.append({name, true, DrawingLayers::FixedKind::None});
 	m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
 	return true;
 }
 
 bool LayersDialog::renameLayer(const QString &name, const QString &new_name)
 {
-	if (!m_project || new_name.isEmpty() || m_project->drawingLayers().contains(new_name)) return false;
+	if (!m_project || new_name.isEmpty() || DrawingLayers::isFixed(name) || DrawingLayers::isFixed(new_name) || m_project->drawingLayers().contains(new_name)) return false;
 	buildFolios();
 	Set set = m_project->drawingLayers();
 	for (auto &layer : set.layers)
@@ -258,7 +290,7 @@ bool LayersDialog::renameLayer(const QString &name, const QString &new_name)
 */
 void LayersDialog::removeLayer(const QString &name)
 {
-	if (!m_project) return;
+	if (!m_project || DrawingLayers::isFixed(name)) return;
 	buildFolios();
 	Set set = m_project->drawingLayers();
 	set.layers.erase(std::remove_if(set.layers.begin(), set.layers.end(),
@@ -292,7 +324,7 @@ void LayersDialog::setLayerVisible(const QString &name, bool visible)
 */
 int LayersDialog::putSelectionOnLayer(const QString &layer, Diagram *folio)
 {
-	if (!m_project) return 0;
+	if (!m_project || DrawingLayers::isFixed(layer)) return 0;
 	if (!folio) {
 		if (auto *editor = qobject_cast<QETDiagramEditor *>(parentWidget()))
 			if (ProjectView *view = editor->currentProjectView())

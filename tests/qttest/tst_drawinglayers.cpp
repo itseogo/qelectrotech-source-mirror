@@ -19,6 +19,7 @@
 #include "diagram.h"
 #include "drawinglayers/drawinglayers.h"
 #include "qetapptest.h"
+#include "qetgraphicsitem/conductortextitem.h"
 #include "qetgraphicsitem/independenttextitem.h"
 #include "qetgraphicsitem/qetshapeitem.h"
 #include "qetgraphicsitem/structureboxitem.h"
@@ -51,7 +52,8 @@ class tst_drawinglayers : public QObject
 	static DrawingLayers::Set twoLayers(bool first = true, bool second = true)
 	{
 		DrawingLayers::Set set;
-		set.layers = {{QStringLiteral("Quote"), first}, {QStringLiteral("Mounting"), second}};
+		set.layers.append({QStringLiteral("Quote"), first});
+		set.layers.append({QStringLiteral("Mounting"), second});
 		set.groups = {{QStringLiteral("For the customer"), {QStringLiteral("Quote")}}};
 		return set;
 	}
@@ -205,16 +207,16 @@ class tst_drawinglayers : public QObject
 		QVERIFY(table);
 		QVERIFY(dialog.addLayer(QStringLiteral("Quote")));
 		QVERIFY(!dialog.addLayer(QStringLiteral("Quote")));
-		QCOMPARE(table->rowCount(), 1);
-		QCOMPARE(table->item(0, 1)->text(), QStringLiteral("Quote"));
+		QCOMPARE(table->rowCount(), 5);
+		QCOMPARE(table->item(4, 1)->text(), QStringLiteral("Quote"));
 		shape->setSelected(true);
 		QCOMPARE(dialog.putSelectionOnLayer(QStringLiteral("Quote"), folio), 1);
 		QCOMPARE(DrawingLayers::layerOf(shape), QStringLiteral("Quote"));
 			//Unticking in the table hides what is on it
-		table->item(0, 0)->setCheckState(Qt::Unchecked);
+		table->item(4, 0)->setCheckState(Qt::Unchecked);
 		QVERIFY(!project.drawingLayers().isVisible(QStringLiteral("Quote")));
 		QVERIFY(!shape->isVisible());
-		table->item(0, 0)->setCheckState(Qt::Checked);
+		table->item(4, 0)->setCheckState(Qt::Checked);
 		QVERIFY(shape->isVisible());
 			//A rename follows on the items and in the groups
 		QVERIFY(dialog.addGroup(QStringLiteral("Customer")));
@@ -225,11 +227,12 @@ class tst_drawinglayers : public QObject
 			//Undo through the stack comes back to the dialog
 		project.undoStack()->undo();
 		QCOMPARE(DrawingLayers::layerOf(shape), QStringLiteral("Quote"));
-		QCOMPARE(table->item(0, 1)->text(), QStringLiteral("Quote"));
+		QCOMPARE(table->item(4, 1)->text(), QStringLiteral("Quote"));
 		project.undoStack()->redo();
 			//Removing a layer keeps what was on it, on no layer
 		dialog.removeLayer(QStringLiteral("Offer"));
-		QVERIFY(project.drawingLayers().layers.isEmpty());
+		QVERIFY(project.drawingLayers().userLayers().isEmpty());
+		QCOMPARE(project.drawingLayers().fixedLayers().size(), 4);
 		QCOMPARE(DrawingLayers::layerOf(shape), QString());
 		QVERIFY(shape->isVisible());
 		QVERIFY(project.drawingLayers().groups.first().layers.isEmpty());
@@ -295,6 +298,126 @@ class tst_drawinglayers : public QObject
 		QCOMPARE(DrawingLayers::layerOf(shape), QString());
 		QVERIFY(shape->isVisible());
 		QVERIFY(project.drawingLayers() == twoLayers());
+	}
+
+	void fixedLayersCannotBeRemovedOrRenamed()
+	{
+		QETProject project;
+		Diagram *folio = project.addNewDiagram();
+		auto *shape = line(folio, QString());
+		LayersDialog dialog(&project);
+		const QString wire_name = DrawingLayers::fixedKindName(DrawingLayers::FixedKind::WireNumbers);
+
+		QVERIFY(DrawingLayers::isFixed(wire_name));
+		QVERIFY(!dialog.addLayer(wire_name));
+		QVERIFY(!dialog.renameLayer(wire_name, QStringLiteral("CustomWires")));
+		dialog.removeLayer(wire_name);
+		QVERIFY(project.drawingLayers().contains(wire_name));
+		QCOMPARE(dialog.putSelectionOnLayer(wire_name, folio), 0);
+		QCOMPARE(DrawingLayers::layerOf(shape), QString());
+	}
+
+	void fixedLayersControlBorderAndShownKinds()
+	{
+		QETProject project;
+		Diagram *folio = project.addNewDiagram();
+		QVERIFY(folio->useBorder());
+
+		auto *cond_text = new ConductorTextItem(QStringLiteral("W1"));
+		folio->addItem(cond_text);
+		QVERIFY(cond_text->isVisible());
+
+		auto *sym_text = new QGraphicsTextItem(QStringLiteral("K1"));
+		ShownKinds::tag(sym_text, ShownKinds::SymbolTexts);
+		folio->addItem(sym_text);
+		QVERIFY(sym_text->isVisible());
+
+		auto *xref = new QGraphicsTextItem(QStringLiteral("/2.3"));
+		ShownKinds::tag(xref, ShownKinds::CrossReferences);
+		folio->addItem(xref);
+		QVERIFY(xref->isVisible());
+
+		// Turn off wire numbers
+		DrawingLayers::Set set = project.drawingLayers();
+		const QString wire_name = DrawingLayers::fixedKindName(DrawingLayers::FixedKind::WireNumbers);
+		for (auto &layer : set.layers) {
+			if (layer.name == wire_name) layer.visible = false;
+		}
+		project.setDrawingLayers(set);
+		QVERIFY(!cond_text->isVisible());
+		QVERIFY(DrawingLayers::isHidden(cond_text));
+		QVERIFY(sym_text->isVisible());
+		QVERIFY(xref->isVisible());
+		QVERIFY(folio->useBorder());
+
+		// Turn off frame and title block
+		const QString frame_name = DrawingLayers::fixedKindName(DrawingLayers::FixedKind::FrameAndTitleBlock);
+		for (auto &layer : set.layers) {
+			if (layer.name == frame_name) layer.visible = false;
+		}
+		project.setDrawingLayers(set);
+		QVERIFY(!folio->useBorder());
+
+		// Turn off symbol texts
+		const QString sym_name = DrawingLayers::fixedKindName(DrawingLayers::FixedKind::SymbolTexts);
+		for (auto &layer : set.layers) {
+			if (layer.name == sym_name) layer.visible = false;
+		}
+		project.setDrawingLayers(set);
+		QVERIFY(!sym_text->isVisible());
+		QVERIFY(DrawingLayers::isHidden(sym_text));
+
+		// Turn off cross-references
+		const QString xref_name = DrawingLayers::fixedKindName(DrawingLayers::FixedKind::CrossReferences);
+		for (auto &layer : set.layers) {
+			if (layer.name == xref_name) layer.visible = false;
+		}
+		project.setDrawingLayers(set);
+		QVERIFY(!xref->isVisible());
+		QVERIFY(DrawingLayers::isHidden(xref));
+
+		// Turn them back on
+		for (auto &layer : set.layers) layer.visible = true;
+		project.setDrawingLayers(set);
+		QVERIFY(cond_text->isVisible());
+		QVERIFY(!DrawingLayers::isHidden(cond_text));
+		QVERIFY(sym_text->isVisible());
+		QVERIFY(!DrawingLayers::isHidden(sym_text));
+		QVERIFY(xref->isVisible());
+		QVERIFY(!DrawingLayers::isHidden(xref));
+		QVERIFY(folio->useBorder());
+	}
+
+	void fixedLayersInGroupsAndPrinting()
+	{
+		QETProject project;
+		Diagram *folio = project.addNewDiagram();
+		auto *cond_text = new ConductorTextItem(QStringLiteral("W2"));
+		folio->addItem(cond_text);
+
+		DrawingLayers::Set set = project.drawingLayers();
+		DrawingLayers::Group group;
+		group.name = QStringLiteral("No Wire Numbers");
+		// Include frame and title block but NOT wire numbers
+		group.layers << DrawingLayers::fixedKindName(DrawingLayers::FixedKind::FrameAndTitleBlock);
+		set.groups.append(group);
+		project.setDrawingLayers(set);
+
+		QVERIFY(cond_text->isVisible());
+		QVERIFY(folio->useBorder());
+
+		{
+			ProjectPrintWindow window(&project, new QPrinter());
+			auto *choice = window.findChild<QComboBox *>(QStringLiteral("m_layer_group_cb"));
+			QVERIFY(choice);
+			choice->setCurrentIndex(1); // Select "No Wire Numbers"
+			QVERIFY(!cond_text->isVisible());
+			QVERIFY(folio->useBorder());
+			// Project itself is not permanently changed
+			QVERIFY(project.drawingLayers().isVisible(DrawingLayers::FixedKind::WireNumbers));
+		}
+		// When print window closes, project layers are restored
+		QVERIFY(cond_text->isVisible());
 	}
 };
 

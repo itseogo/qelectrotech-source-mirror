@@ -397,7 +397,7 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 		} else if (DynamicElementTextItem *deti = qgraphicsitem_cast<DynamicElementTextItem *>(qgi)) {
 			list_texts << deti;
 			QGraphicsTextItem *xref = deti->slaveXrefItem();
-			if (xref && !ShownKinds::isHidden(xref)) {
+			if (xref && !ShownKinds::isHidden(xref) && !DrawingLayers::isHidden(xref)) {
 				list_xref_texts << xref;
 			}
 		} else if (QetGraphicsTableItem *gti = qgraphicsitem_cast<QetGraphicsTableItem *>(qgi)) {
@@ -585,7 +585,9 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 		QRectF rect(Diagram::margin,Diagram::margin,width,height);
 		Createdxf::drawRectangle(file_path,rect,0);
 	}
-	diagram -> border_and_titleblock.drawDxf(file_path, 0);
+	if (diagram->useBorder()) {
+		diagram -> border_and_titleblock.drawDxf(file_path, 0);
+	}
 
 	// Draw shapes
 	Createdxf::layer = Layer::Shapes;
@@ -643,7 +645,7 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 		Createdxf::layer = Layer::WireNumbers;
 		ConductorTextItem *textItem = cond -> textItem();
 
-		if (textItem && !ShownKinds::isHidden(textItem)) {
+		if (textItem && !ShownKinds::isHidden(textItem) && !DrawingLayers::isHidden(textItem)) {
 			qreal fontSize = textItem -> font().pointSizeF();
 			if (fontSize < 0)
 				fontSize = textItem -> font().pixelSize();

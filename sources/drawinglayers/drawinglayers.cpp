@@ -25,27 +25,192 @@
 #include "../shownkinds.h"
 
 #include <QGraphicsItem>
+#include <QObject>
 
 namespace DrawingLayers
 {
 	namespace
 	{
-		const int LayerKey = 0x4c4159;  // "LAY"
+		const int LayerKey = 0x4c4159;       // "LAY"
+		const int LayerHiddenKey = 0x4c4148; // "LAH"
+
+		void applyFixedKindItem(QGraphicsItem *item, bool show, ShownKinds::Kind kind)
+		{
+			if (!item) return;
+			if (!show) {
+				if (item->isVisibleTo(item->parentItem())) {
+					item->setVisible(false);
+					item->setData(LayerHiddenKey, true);
+				} else if (item->data(LayerHiddenKey).toBool()) {
+					item->setVisible(false);
+				}
+			} else {
+				if (item->data(LayerHiddenKey).toBool()) {
+					item->setData(LayerHiddenKey, QVariant());
+					ShownKinds::setVisible(item, true);
+				}
+			}
+		}
+	}
+
+	QString fixedKindName(FixedKind kind)
+	{
+		switch (kind) {
+			case FixedKind::FrameAndTitleBlock:
+				return QStringLiteral("Frame and title block");
+			case FixedKind::WireNumbers:
+				return QStringLiteral("Wire numbers");
+			case FixedKind::SymbolTexts:
+				return QStringLiteral("Symbol texts");
+			case FixedKind::CrossReferences:
+				return QStringLiteral("Cross-references");
+			default:
+				return QString();
+		}
+	}
+
+	QString fixedKindDisplayName(FixedKind kind)
+	{
+		switch (kind) {
+			case FixedKind::FrameAndTitleBlock:
+				return QObject::tr("Frame and title block");
+			case FixedKind::WireNumbers:
+				return QObject::tr("Wire numbers");
+			case FixedKind::SymbolTexts:
+				return QObject::tr("Symbol texts");
+			case FixedKind::CrossReferences:
+				return QObject::tr("Cross-references");
+			default:
+				return QString();
+		}
+	}
+
+	QString fixedKindAttribute(FixedKind kind)
+	{
+		switch (kind) {
+			case FixedKind::FrameAndTitleBlock:
+				return QStringLiteral("frame_titleblock");
+			case FixedKind::WireNumbers:
+				return QStringLiteral("wire_numbers");
+			case FixedKind::SymbolTexts:
+				return QStringLiteral("symbol_texts");
+			case FixedKind::CrossReferences:
+				return QStringLiteral("cross_references");
+			default:
+				return QString();
+		}
+	}
+
+	FixedKind fixedKindFromAttribute(const QString &attr)
+	{
+		if (attr == QLatin1String("frame_titleblock")) return FixedKind::FrameAndTitleBlock;
+		if (attr == QLatin1String("wire_numbers")) return FixedKind::WireNumbers;
+		if (attr == QLatin1String("symbol_texts")) return FixedKind::SymbolTexts;
+		if (attr == QLatin1String("cross_references")) return FixedKind::CrossReferences;
+		return FixedKind::None;
+	}
+
+	FixedKind fixedKindOf(const QString &name)
+	{
+		if (name == fixedKindName(FixedKind::FrameAndTitleBlock) || name == fixedKindDisplayName(FixedKind::FrameAndTitleBlock))
+			return FixedKind::FrameAndTitleBlock;
+		if (name == fixedKindName(FixedKind::WireNumbers) || name == fixedKindDisplayName(FixedKind::WireNumbers))
+			return FixedKind::WireNumbers;
+		if (name == fixedKindName(FixedKind::SymbolTexts) || name == fixedKindDisplayName(FixedKind::SymbolTexts))
+			return FixedKind::SymbolTexts;
+		if (name == fixedKindName(FixedKind::CrossReferences) || name == fixedKindDisplayName(FixedKind::CrossReferences))
+			return FixedKind::CrossReferences;
+		return FixedKind::None;
+	}
+
+	bool isFixed(const QString &name)
+	{
+		return fixedKindOf(name) != FixedKind::None;
+	}
+
+	QList<Layer> defaultFixedLayers()
+	{
+		return {
+			{fixedKindName(FixedKind::FrameAndTitleBlock), true, FixedKind::FrameAndTitleBlock},
+			{fixedKindName(FixedKind::WireNumbers),        true, FixedKind::WireNumbers},
+			{fixedKindName(FixedKind::SymbolTexts),        true, FixedKind::SymbolTexts},
+			{fixedKindName(FixedKind::CrossReferences),    true, FixedKind::CrossReferences}
+		};
+	}
+
+	Set::Set()
+	{
+		ensureFixedLayers();
+	}
+
+	void Set::ensureFixedLayers()
+	{
+		const auto fixed = defaultFixedLayers();
+		for (int i = 0 ; i < fixed.size() ; ++i) {
+			const auto &fl = fixed.at(i);
+			bool found = false;
+			for (const Layer &l : layers) {
+				if (l.fixed_kind == fl.fixed_kind || l.name == fl.name) {
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				layers.insert(i, fl);
+			}
+		}
+	}
+
+	QList<Layer> Set::userLayers() const
+	{
+		QList<Layer> result;
+		for (const Layer &l : layers) {
+			if (!l.isFixed()) result.append(l);
+		}
+		return result;
+	}
+
+	QList<Layer> Set::fixedLayers() const
+	{
+		QList<Layer> result;
+		for (const Layer &l : layers) {
+			if (l.isFixed()) result.append(l);
+		}
+		return result;
+	}
+
+	bool Set::isEmpty() const
+	{
+		if (!groups.isEmpty()) return false;
+		if (!userLayers().isEmpty()) return false;
+		for (const Layer &layer : layers) {
+			if (layer.isFixed() && !layer.visible) return false;
+		}
+		return true;
 	}
 
 	bool Set::contains(const QString &name) const
 	{
+		if (isFixed(name)) return true;
 		for (const Layer &layer : layers)
 			if (layer.name == name) return true;
 		return false;
 	}
 
-	/**
-		@return whether what is on layer @p name shows; a layer the project
-		does not know (a pasted item's) is on
-	*/
+	bool Set::isVisible(FixedKind kind) const
+	{
+		if (kind == FixedKind::None) return true;
+		for (const Layer &layer : layers) {
+			if (layer.fixed_kind == kind || layer.name == fixedKindName(kind))
+				return layer.visible;
+		}
+		return true;
+	}
+
 	bool Set::isVisible(const QString &name) const
 	{
+		const FixedKind fk = fixedKindOf(name);
+		if (fk != FixedKind::None) return isVisible(fk);
 		for (const Layer &layer : layers)
 			if (layer.name == name) return layer.visible;
 		return true;
@@ -58,9 +223,6 @@ namespace DrawingLayers
 		return list;
 	}
 
-	/**
-		@return this set with the layers of @p group on and the others off
-	*/
 	Set Set::showing(const Group &group) const
 	{
 		Set set = *this;
@@ -75,6 +237,9 @@ namespace DrawingLayers
 			QDomElement element = document.createElement(QStringLiteral("layer"));
 			element.setAttribute(QStringLiteral("name"), layer.name);
 			element.setAttribute(QStringLiteral("visible"), layer.visible ? QStringLiteral("true") : QStringLiteral("false"));
+			if (layer.isFixed()) {
+				element.setAttribute(QStringLiteral("fixed"), fixedKindAttribute(layer.fixed_kind));
+			}
 			root.appendChild(element);
 		}
 		for (const Group &group : groups) {
@@ -93,12 +258,34 @@ namespace DrawingLayers
 	Set Set::fromXml(const QDomElement &element)
 	{
 		Set set;
+		if (element.isNull()) return set;
+
 		for (QDomElement e = element.firstChildElement(QStringLiteral("layer")) ; !e.isNull()
 			 ; e = e.nextSiblingElement(QStringLiteral("layer"))) {
 			const QString name = e.attribute(QStringLiteral("name")).trimmed();
-			if (name.isEmpty() || set.contains(name)) continue;
-			set.layers.append({name, e.attribute(QStringLiteral("visible")) != QLatin1String("false")});
+			if (name.isEmpty()) continue;
+			const bool visible = (e.attribute(QStringLiteral("visible")) != QLatin1String("false"));
+			FixedKind fk = FixedKind::None;
+			if (e.hasAttribute(QStringLiteral("fixed"))) {
+				fk = fixedKindFromAttribute(e.attribute(QStringLiteral("fixed")));
+			} else {
+				fk = fixedKindOf(name);
+			}
+
+			bool found = false;
+			for (Layer &l : set.layers) {
+				if ((fk != FixedKind::None && l.fixed_kind == fk) || l.name == name) {
+					l.visible = visible;
+					l.fixed_kind = fk;
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				set.layers.append({name, visible, fk});
+			}
 		}
+		set.groups.clear();
 		for (QDomElement e = element.firstChildElement(QStringLiteral("layer_group")) ; !e.isNull()
 			 ; e = e.nextSiblingElement(QStringLiteral("layer_group"))) {
 			Group group;
@@ -148,7 +335,11 @@ namespace DrawingLayers
 	*/
 	bool isHidden(const QGraphicsItem *item)
 	{
-		return item && !layerOf(item).isEmpty() && !item->isVisible();
+		for (const QGraphicsItem *p = item; p; p = p->parentItem()) {
+			if (!layerOf(p).isEmpty() && !p->isVisible()) return true;
+			if (p->data(LayerHiddenKey).toBool()) return true;
+		}
+		return false;
 	}
 
 	/**
@@ -165,7 +356,32 @@ namespace DrawingLayers
 	void applyTo(Diagram *folio, const Set &set)
 	{
 		if (!folio) return;
-		for (QGraphicsItem *item : folio->items())
-			apply(item, set);
+
+		const bool show_frame = set.isVisible(FixedKind::FrameAndTitleBlock);
+		if (folio->useBorder() != show_frame) {
+			folio->setUseBorder(show_frame);
+			folio->update();
+		}
+
+		const bool show_wires = set.isVisible(FixedKind::WireNumbers);
+		const bool show_symbols = set.isVisible(FixedKind::SymbolTexts);
+		const bool show_xrefs = set.isVisible(FixedKind::CrossReferences);
+
+		for (QGraphicsItem *item : folio->items()) {
+			if (canBeOnLayer(item)) {
+				apply(item, set);
+				continue;
+			}
+			const QVariant val = item->data(ShownKinds::data_key);
+			if (!val.isValid()) continue;
+			const int kind = val.toInt();
+			if (kind == ShownKinds::WireNumbers) {
+				applyFixedKindItem(item, show_wires, ShownKinds::WireNumbers);
+			} else if (kind == ShownKinds::SymbolTexts) {
+				applyFixedKindItem(item, show_symbols, ShownKinds::SymbolTexts);
+			} else if (kind == ShownKinds::CrossReferences) {
+				applyFixedKindItem(item, show_xrefs, ShownKinds::CrossReferences);
+			}
+		}
 	}
 }

@@ -51,6 +51,9 @@ class LayersDialog : public QDialog
 		void setGroupLayers(const QString &name, const QStringList &layers);
 		void showGroup(const QString &name);
 
+	private slots:
+		void updateButtonStates();
+
 	private:
 		QString currentLayer() const;
 		QString currentGroup() const;
@@ -62,6 +65,10 @@ class LayersDialog : public QDialog
 		QListWidget *m_groups;
 		QListWidget *m_members;
 		QLabel *m_summary;
+		QPushButton *m_rename_btn = nullptr;
+		QPushButton *m_remove_btn = nullptr;
+		QPushButton *m_put_btn = nullptr;
+		QPushButton *m_take_btn = nullptr;
 		bool m_refreshing = false;
 };
 
