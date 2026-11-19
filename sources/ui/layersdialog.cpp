@@ -81,7 +81,7 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 
 	m_layers->setObjectName(QStringLiteral("layersTable"));
 	m_layers->setHorizontalHeaderLabels(
-		{tr("Name"),
+		{tr("Layer"),
 		 tr("Description"),
 		 tr("Shown"),
 		 tr("Print"),
@@ -124,6 +124,8 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 		button(layer_buttons, tr("Take the selection off"), "layerTake");
 	auto* import_btn = button(layer_buttons, tr("Import..."), "layerImport");
 	auto* export_btn = button(layer_buttons, tr("Export..."), "layerExport");
+	auto* load_standards_btn =
+		button(layer_buttons, tr("Load standard layers"), "layerLoadStandards");
 	layer_buttons->addStretch();
 	layers_layout->addLayout(layer_buttons);
 	layout->addWidget(layers_box, 1);
@@ -153,6 +155,12 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 		&QLineEdit::textChanged,
 		this,
 		&LayersDialog::filterLayers);
+
+	connect(
+		load_standards_btn,
+		&QPushButton::clicked,
+		this,
+		&LayersDialog::loadStandardLayers);
 
 	connect(
 		import_btn,
@@ -762,4 +770,15 @@ bool LayersDialog::importLayers(const QString& file_path)
 		tr("Import layers"),
 		tr("Successfully imported %1 layers.").arg(count));
 	return true;
+}
+
+void LayersDialog::loadStandardLayers()
+{
+	if (! m_project) return;
+	Set set = m_project->drawingLayers();
+	DrawingLayers::loadStandardPresets(set);
+	if (set != m_project->drawingLayers())
+	{
+		m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
+	}
 }

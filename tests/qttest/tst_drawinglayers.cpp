@@ -22,6 +22,7 @@
 #include "qetapptest.h"
 #include "qetgraphicsitem/conductortextitem.h"
 #include "qetgraphicsitem/crossrefitem.h"
+#include "qetgraphicsitem/dynamicelementtextitem.h"
 #include "qetgraphicsitem/independenttextitem.h"
 #include "qetgraphicsitem/qetshapeitem.h"
 #include "qetgraphicsitem/structureboxitem.h"
@@ -655,6 +656,126 @@ class tst_drawinglayers : public QObject
 			! project2.drawingLayers().contains(QStringLiteral("100_Grafik")));
 		QVERIFY(! project2.drawingLayers().contains(
 			QStringLiteral("109_Kommentar")));
+	}
+
+	void standardPresetsAndDynamicElementTextLayers()
+	{
+		// 1. Standard presets loading
+		DrawingLayers::Set preset_set;
+		DrawingLayers::loadStandardPresets(preset_set);
+		QCOMPARE(
+			preset_set.layers.size(),
+			15); // 4 fixed system layers + 11 preset layers
+
+		const QStringList expected_layers = {
+			QStringLiteral("100"),
+			QStringLiteral("101"),
+			QStringLiteral("102"),
+			QStringLiteral("107"),
+			QStringLiteral("108"),
+			QStringLiteral("109"),
+			QStringLiteral("201"),
+			QStringLiteral("307"),
+			QStringLiteral("400"),
+			QStringLiteral("405"),
+			QStringLiteral("420")};
+		for (const QString& name : expected_layers)
+		{
+			QVERIFY(preset_set.contains(name));
+		}
+
+		QCOMPARE(
+			preset_set.description(QStringLiteral("201")),
+			QObject::tr("Graphics.Folio border"));
+		QCOMPARE(
+			preset_set.description(QStringLiteral("400")),
+			QObject::tr("Element texts.Device tags (BMK)"));
+		QVERIFY(preset_set.isVisible(QStringLiteral("109")));
+		QVERIFY(! preset_set.isPrintable(QStringLiteral("109")));
+
+		// 2. Preset group "Without device tags"
+		QCOMPARE(preset_set.groups.size(), 1);
+		QCOMPARE(
+			preset_set.groups.first().name,
+			QObject::tr("Without device tags"));
+
+		const DrawingLayers::Set without_bmk =
+			preset_set.showing(preset_set.groups.first());
+		QVERIFY(! without_bmk.isVisible(QStringLiteral("400")));
+		QVERIFY(! without_bmk.isVisible(
+			DrawingLayers::fixedKindName(
+				DrawingLayers::FixedKind::SymbolTexts)));
+		QVERIFY(without_bmk.isVisible(QStringLiteral("100")));
+		QVERIFY(without_bmk.isVisible(QStringLiteral("201")));
+		QVERIFY(without_bmk.isVisible(QStringLiteral("405")));
+		QVERIFY(without_bmk.isVisible(
+			DrawingLayers::fixedKindName(
+				DrawingLayers::FixedKind::WireNumbers)));
+
+		// 3. DynamicElementTextItem layer assignment and XML round-trip
+		QETProject project(QFINDTESTDATA("fixtures/every_feature.qet"));
+		QCOMPARE(project.state(), QETProject::Ok);
+		Element* e = nullptr;
+		for (Diagram* d : project.diagrams())
+		{
+			for (Element* el : d->elements())
+			{
+				if (el)
+				{
+					e = el;
+					break;
+				}
+			}
+			if (e) break;
+		}
+		QVERIFY(e);
+		Diagram* folio = e->diagram();
+		auto*	 deti  = new DynamicElementTextItem(e);
+		e->addDynamicTextItem(deti);
+
+		QVERIFY(DrawingLayers::canBeOnLayer(deti));
+		QVERIFY(deti->layer().isEmpty());
+
+		deti->setLayer(QStringLiteral("400"));
+		QCOMPARE(deti->layer(), QStringLiteral("400"));
+		QCOMPARE(DrawingLayers::layerOf(deti), QStringLiteral("400"));
+
+		QDomDocument	  doc;
+		const QDomElement deti_xml = deti->toXml(doc);
+		QCOMPARE(
+			deti_xml.attribute(QStringLiteral("layer")),
+			QStringLiteral("400"));
+
+		auto* restored_deti = new DynamicElementTextItem(e);
+		restored_deti->fromXml(deti_xml);
+		QCOMPARE(restored_deti->layer(), QStringLiteral("400"));
+		delete restored_deti;
+
+		// 4. Folio visibility applying
+		DrawingLayers::applyTo(folio, preset_set);
+		QVERIFY(deti->isVisible());
+
+		DrawingLayers::applyTo(folio, without_bmk);
+		QVERIFY(! deti->isVisible());
+
+		// 5. Load standard layers in LayersDialog with undo/redo
+		QETProject	 project_dlg;
+		LayersDialog dlg(&project_dlg);
+		dlg.loadStandardLayers();
+
+		QVERIFY(project_dlg.drawingLayers().contains(QStringLiteral("100")));
+		QVERIFY(project_dlg.drawingLayers().contains(QStringLiteral("400")));
+		QCOMPARE(project_dlg.drawingLayers().groups.size(), 1);
+
+		QVERIFY(project_dlg.undoStack()->canUndo());
+		project_dlg.undoStack()->undo();
+		QVERIFY(! project_dlg.drawingLayers().contains(QStringLiteral("100")));
+		QVERIFY(! project_dlg.drawingLayers().contains(QStringLiteral("400")));
+		QCOMPARE(project_dlg.drawingLayers().groups.size(), 0);
+
+		project_dlg.undoStack()->redo();
+		QVERIFY(project_dlg.drawingLayers().contains(QStringLiteral("100")));
+		QVERIFY(project_dlg.drawingLayers().contains(QStringLiteral("400")));
 	}
 };
 

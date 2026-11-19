@@ -58,6 +58,7 @@ class LayersDialog : public QDialog
 	void filterLayers(const QString& filter_text);
 	bool exportLayers(const QString& file_path = QString());
 	bool importLayers(const QString& file_path = QString());
+	void loadStandardLayers();
 
   private slots:
 	void updateButtonStates();

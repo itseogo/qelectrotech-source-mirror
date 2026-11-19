@@ -17,7 +17,19 @@
 */
 #include "dynamicelementtextmodel.h"
 
+#include "../drawinglayers/drawinglayers.h"
+#include "../qetproject.h"
+#include "alignmenttextdialog.h"
+#include "compositetexteditdialog.h"
+
+#include <QColorDialog>
+#include <QComboBox>
+#include <QHash>
+#include <QModelIndex>
 #include <QPropertyUndoCommand/qpropertyundocommand.h>
+#include <QStandardItem>
+#include <QTimer>
+#include <QUndoCommand>
 #include <diagram.h>
 #include <qetapp.h>
 #include <qetgraphicsitem/conductor.h>
@@ -28,87 +40,113 @@
 #include <qeticons.h>
 #include <qetinformation.h>
 #include <undocommand/addelementtextcommand.h>
-#include "alignmenttextdialog.h"
-#include "compositetexteditdialog.h"
 
-#include <QColorDialog>
-#include <QComboBox>
-#include <QHash>
-#include <QModelIndex>
-#include <QStandardItem>
-#include <QTimer>
-#include <QUndoCommand>
-
-namespace {
+namespace
+{
 	/**
 		@return the name an information is shown with: its translation,
 		or the key itself for a user-defined custom property, which
 		has none.
 	*/
-	QString infoDisplayName(const QString &key)
+	QString infoDisplayName(const QString& key)
 	{
 		const QString name = QETInformation::translatedInfoKey(key);
 		return name.isEmpty() ? key : name;
 	}
-}
+} // namespace
 
-static int src_txt_row   = 0;
-static int usr_txt_row   = 1;
-static int info_txt_row  = 2;
-static int compo_txt_row = 3;
-static int size_txt_row  = 4;
-static int font_txt_row  = 5;
-static int color_txt_row = 6;
-static int frame_txt_row = 7;
-static int width_txt_row = 8;
-static int width_fix_row = 9;
+static int src_txt_row	  = 0;
+static int usr_txt_row	  = 1;
+static int info_txt_row	  = 2;
+static int compo_txt_row  = 3;
+static int size_txt_row	  = 4;
+static int font_txt_row	  = 5;
+static int color_txt_row  = 6;
+static int frame_txt_row  = 7;
+static int width_txt_row  = 8;
+static int width_fix_row  = 9;
 static int height_txt_row = 10;
 static int height_fix_row = 11;
-static int x_txt_row     = 12;
-static int y_txt_row     = 13;
-static int rot_txt_row   = 14;
-static int keep_rot_row  = 15;
-static int align_txt_row = 16;
+static int x_txt_row	  = 12;
+static int y_txt_row	  = 13;
+static int rot_txt_row	  = 14;
+static int keep_rot_row	  = 15;
+static int align_txt_row  = 16;
+static int layer_txt_row  = 17;
 
-static int align_grp_row          = 0;
-static int x_grp_row              = 1;
-static int y_grp_row              = 2;
-static int rot_grp_row            = 3;
-static int adjust_grp_row         = 4;
-static int frame_grp_row          = 5;
+static int align_grp_row		  = 0;
+static int x_grp_row			  = 1;
+static int y_grp_row			  = 2;
+static int rot_grp_row			  = 3;
+static int adjust_grp_row		  = 4;
+static int frame_grp_row		  = 5;
 static int hold_to_bottom_grp_row = 6;
 
-DynamicElementTextModel::DynamicElementTextModel(Element *element, QObject *parent) :
-	QStandardItemModel(parent),
-	m_element(element)
+DynamicElementTextModel::DynamicElementTextModel(
+	Element* element, QObject* parent) :
+	QStandardItemModel(parent), m_element(element)
 {
 	setColumnCount(2);
 	setHeaderData(0, Qt::Horizontal, tr("Property"), Qt::DisplayRole);
 	setHeaderData(1, Qt::Horizontal, tr("Value"), Qt::DisplayRole);
 
-	connect(this, &DynamicElementTextModel::itemChanged, this, &DynamicElementTextModel::itemDataChanged);
+	connect(
+		this,
+		&DynamicElementTextModel::itemChanged,
+		this,
+		&DynamicElementTextModel::itemDataChanged);
 
-	connect(m_element.data(), &Element::textsGroupAdded,            this, &DynamicElementTextModel::addGroup,            Qt::DirectConnection);
-	connect(m_element.data(), &Element::textsGroupAboutToBeRemoved, this, &DynamicElementTextModel::removeGroup,         Qt::DirectConnection);
-	connect(m_element.data(), &Element::textRemoved,                this, &DynamicElementTextModel::removeText,          Qt::DirectConnection);
-	connect(m_element.data(), &Element::textRemovedFromGroup,       this, &DynamicElementTextModel::removeTextFromGroup, Qt::DirectConnection);
-	connect(m_element.data(), &Element::textAdded,                  this, &DynamicElementTextModel::addText,             Qt::DirectConnection);
-	connect(m_element.data(), &Element::textAddedToGroup,           this, &DynamicElementTextModel::addTextToGroup,      Qt::DirectConnection);
-	
-	for (ElementTextItemGroup *grp : m_element.data()->textGroups())
+	connect(
+		m_element.data(),
+		&Element::textsGroupAdded,
+		this,
+		&DynamicElementTextModel::addGroup,
+		Qt::DirectConnection);
+	connect(
+		m_element.data(),
+		&Element::textsGroupAboutToBeRemoved,
+		this,
+		&DynamicElementTextModel::removeGroup,
+		Qt::DirectConnection);
+	connect(
+		m_element.data(),
+		&Element::textRemoved,
+		this,
+		&DynamicElementTextModel::removeText,
+		Qt::DirectConnection);
+	connect(
+		m_element.data(),
+		&Element::textRemovedFromGroup,
+		this,
+		&DynamicElementTextModel::removeTextFromGroup,
+		Qt::DirectConnection);
+	connect(
+		m_element.data(),
+		&Element::textAdded,
+		this,
+		&DynamicElementTextModel::addText,
+		Qt::DirectConnection);
+	connect(
+		m_element.data(),
+		&Element::textAddedToGroup,
+		this,
+		&DynamicElementTextModel::addTextToGroup,
+		Qt::DirectConnection);
+
+	for (ElementTextItemGroup* grp : m_element.data()->textGroups())
 		addGroup(grp);
-	
-	for (DynamicElementTextItem *deti : m_element.data()->dynamicTextItems())
+
+	for (DynamicElementTextItem* deti : m_element.data()->dynamicTextItems())
 		this->appendRow(itemsForText(deti));
 }
 
 DynamicElementTextModel::~DynamicElementTextModel()
 {
-		//Connection is not destroy automatically,
-		//because was not connected to a slot, but a lambda
-	for(DynamicElementTextItem *deti : m_hash_text_connect.keys())
+	// Connection is not destroy automatically,
+	// because was not connected to a slot, but a lambda
+	for (DynamicElementTextItem* deti : m_hash_text_connect.keys())
 		setConnection(deti, false);
-	for(ElementTextItemGroup *group : m_hash_group_connect.keys())
+	for (ElementTextItemGroup* group : m_hash_group_connect.keys())
 		setConnection(group, false);
 }
 
@@ -123,26 +161,31 @@ DynamicElementTextModel::~DynamicElementTextModel()
 	@param size : the size set, -1 when not fixed
 	@param now : the size the field has now
 */
-static void setSizeItem(QStandardItem *value, QStandardItem *fixed, qreal size, qreal now)
+static void
+setSizeItem(QStandardItem* value, QStandardItem* fixed, qreal size, qreal now)
 {
-	if (!value || !fixed)
-		return;
+	if (! value || ! fixed) return;
 	const bool is_fixed = size > 0;
 	fixed->setCheckState(is_fixed ? Qt::Checked : Qt::Unchecked);
 	value->setData(qRound(is_fixed ? size : now), Qt::EditRole);
 	Qt::ItemFlags flags = Qt::ItemIsSelectable | Qt::ItemIsEnabled;
-	if (is_fixed)
-		flags |= Qt::ItemIsEditable;
+	if (is_fixed) flags |= Qt::ItemIsEditable;
 	value->setFlags(flags);
 }
 
-static void setSizeItems(QStandardItem *text_qsi, DynamicElementTextItem *deti)
+static void setSizeItems(QStandardItem* text_qsi, DynamicElementTextItem* deti)
 {
 	const QRectF box = deti->boundingRect();
-	setSizeItem(text_qsi->child(width_txt_row, 1), text_qsi->child(width_fix_row, 1),
-				deti->textWidth(), box.width());
-	setSizeItem(text_qsi->child(height_txt_row, 1), text_qsi->child(height_fix_row, 1),
-				deti->textHeight(), box.height());
+	setSizeItem(
+		text_qsi->child(width_txt_row, 1),
+		text_qsi->child(width_fix_row, 1),
+		deti->textWidth(),
+		box.width());
+	setSizeItem(
+		text_qsi->child(height_txt_row, 1),
+		text_qsi->child(height_fix_row, 1),
+		deti->textHeight(),
+		box.height());
 }
 
 /**
@@ -150,16 +193,14 @@ static void setSizeItems(QStandardItem *text_qsi, DynamicElementTextItem *deti)
 	@param index
 	@return True if the index represent a group or an item in a group
 */
-bool DynamicElementTextModel::indexIsInGroup(const QModelIndex &index) const
+bool DynamicElementTextModel::indexIsInGroup(const QModelIndex& index) const
 {
-	QStandardItem *item = itemFromIndex(index);
-	if(item)
+	QStandardItem* item = itemFromIndex(index);
+	if (item)
 	{
-		while (item->parent())
-			item = item->parent();
-		
-		if(m_groups_list.values().contains(item))
-			return true;
+		while (item->parent()) item = item->parent();
+
+		if (m_groups_list.values().contains(item)) return true;
 		else
 			return false;
 	}
@@ -175,23 +216,20 @@ bool DynamicElementTextModel::indexIsInGroup(const QModelIndex &index) const
 	The returned items haven't got the same number
 	of childs if the text is in a group or not.
 */
-QList<QStandardItem *> DynamicElementTextModel::itemsForText(
-		DynamicElementTextItem *deti)
+QList<QStandardItem*>
+DynamicElementTextModel::itemsForText(DynamicElementTextItem* deti)
 {
-	QList <QStandardItem *> qsi_list;
-	
-	if(m_texts_list.contains(deti))
-		return qsi_list;
+	QList<QStandardItem*> qsi_list;
 
-	QStandardItem *qsi = new QStandardItem(deti->toPlainText());
-	qsi->setFlags(Qt::ItemIsSelectable
-		      | Qt::ItemIsEnabled
-		      |Qt::ItemIsDragEnabled);
+	if (m_texts_list.contains(deti)) return qsi_list;
+
+	QStandardItem* qsi = new QStandardItem(deti->toPlainText());
+	qsi->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled);
 	qsi->setIcon(QET::Icons::PartText);
-	
-	
-	//Source of text
-	QStandardItem *src = new QStandardItem(tr("Source of text"));
+
+	// Source of text
+	QStandardItem* src = new QStandardItem(tr("Source of text"));
 	src->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
 
 	QString title;
@@ -199,269 +237,289 @@ QList<QStandardItem *> DynamicElementTextModel::itemsForText(
 		title = tr("User text");
 	else if (deti->textFrom() == DynamicElementTextItem::ElementInfo)
 		title = tr("Element information");
-	else title =  tr("Composite text");
-	QStandardItem *srca = new QStandardItem(title);
-	srca->setFlags(Qt::ItemIsSelectable
-		       | Qt::ItemIsEnabled
-		       | Qt::ItemIsEditable);
-	srca->setData(textFrom, Qt::UserRole+1);
+	else
+		title = tr("Composite text");
+	QStandardItem* srca = new QStandardItem(title);
+	srca->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+	srca->setData(textFrom, Qt::UserRole + 1);
 
 	qsi_list << src << srca;
 	qsi->appendRow(qsi_list);
 
-	//User text
-	QStandardItem *usr = new QStandardItem(tr("Text"));
+	// User text
+	QStandardItem* usr = new QStandardItem(tr("Text"));
 	usr->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
 
-	QStandardItem *usra = new QStandardItem(deti->toPlainText());
-	usra->setFlags(Qt::ItemIsSelectable
-		       | Qt::ItemIsEnabled
-		       | Qt::ItemIsEditable);
-	usra->setData(DynamicElementTextModel::userText, Qt::UserRole+1);
+	QStandardItem* usra = new QStandardItem(deti->toPlainText());
+	usra->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+	usra->setData(DynamicElementTextModel::userText, Qt::UserRole + 1);
 
 	qsi_list.clear();
 	qsi_list << usr << usra;
 	qsi->appendRow(qsi_list);
 
-		//Info text
-	QStandardItem *info = new QStandardItem(tr("Information"));
+	// Info text
+	QStandardItem* info = new QStandardItem(tr("Information"));
 	info->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
 
-	QStandardItem *infoa =
-			new QStandardItem(
-				infoDisplayName(
-					deti->infoName()));
-	infoa->setFlags(Qt::ItemIsSelectable
-			| Qt::ItemIsEnabled
-			| Qt::ItemIsEditable);
-	//Use to know the edited thing
-	infoa->setData(DynamicElementTextModel::infoText, Qt::UserRole+1);
-	//Use to know to element info name
-	infoa->setData(deti->infoName(), Qt::UserRole+2);
+	QStandardItem* infoa = new QStandardItem(infoDisplayName(deti->infoName()));
+	infoa->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+	// Use to know the edited thing
+	infoa->setData(DynamicElementTextModel::infoText, Qt::UserRole + 1);
+	// Use to know to element info name
+	infoa->setData(deti->infoName(), Qt::UserRole + 2);
 
 	qsi_list.clear();
 	qsi_list << info << infoa;
 	qsi->appendRow(qsi_list);
-	
-		//Composite text
-	QStandardItem *composite = new QStandardItem(tr("Composite text"));
+
+	// Composite text
+	QStandardItem* composite = new QStandardItem(tr("Composite text"));
 	composite->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-	
+
 	DiagramContext dc;
-	if(deti->elementUseForInfo())
+	if (deti->elementUseForInfo())
 		dc = deti->elementUseForInfo()->elementInformations();
-	QStandardItem *compositea = new QStandardItem(deti->compositeText().isEmpty()
-						      ? tr("My composite text")
-						      : autonum::AssignVariables::replaceVariable(
-								deti->compositeText(), dc, deti->elementUseForInfo()));
-	compositea->setFlags(Qt::ItemIsSelectable
-			     | Qt::ItemIsEnabled
-			     | Qt::ItemIsEditable);
-	//Use to know the edited thing
-	compositea->setData(DynamicElementTextModel::compositeText,
-			    Qt::UserRole+1);
-	//Use to know to element composite formula
-	compositea->setData(deti->compositeText(), Qt::UserRole+2);
-	
+	QStandardItem* compositea = new QStandardItem(
+		deti->compositeText().isEmpty() ?
+			tr("My composite text") :
+			autonum::AssignVariables::replaceVariable(
+				deti->compositeText(),
+				dc,
+				deti->elementUseForInfo()));
+	compositea->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+	// Use to know the edited thing
+	compositea->setData(
+		DynamicElementTextModel::compositeText,
+		Qt::UserRole + 1);
+	// Use to know to element composite formula
+	compositea->setData(deti->compositeText(), Qt::UserRole + 2);
+
 	qsi_list.clear();
 	qsi_list << composite << compositea;
 	qsi->appendRow(qsi_list);
 
-	//Size
-	QStandardItem *size = new QStandardItem(tr("Size"));
+	// Size
+	QStandardItem* size = new QStandardItem(tr("Size"));
 	size->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
 
-	QStandardItem *siza = new QStandardItem();
+	QStandardItem* siza = new QStandardItem();
 	siza->setData(deti->font().pointSize(), Qt::EditRole);
-	siza->setData(DynamicElementTextModel::size, Qt::UserRole+1);
-	siza->setFlags(Qt::ItemIsSelectable
-		       | Qt::ItemIsEnabled
-		       | Qt::ItemIsEditable);
+	siza->setData(DynamicElementTextModel::size, Qt::UserRole + 1);
+	siza->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
 
 	qsi_list.clear();
 	qsi_list << size << siza;
 	qsi->appendRow(qsi_list);
 
-		//Font
-	QStandardItem *font = new QStandardItem(tr("Font"));
+	// Font
+	QStandardItem* font = new QStandardItem(tr("Font"));
 	font->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
 
-	QStandardItem *fonta = new QStandardItem();
+	QStandardItem* fonta = new QStandardItem();
 	fonta->setData(deti->font().family(), Qt::EditRole);
-	fonta->setData(DynamicElementTextModel::font, Qt::UserRole+1);
-	fonta->setData(deti->font(), Qt::UserRole+2);
-	fonta->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+	fonta->setData(DynamicElementTextModel::font, Qt::UserRole + 1);
+	fonta->setData(deti->font(), Qt::UserRole + 2);
+	fonta->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
 
 	qsi_list.clear();
 	qsi_list << font << fonta;
 	qsi->appendRow(qsi_list);
 
-	//Color
-	QStandardItem *color = new QStandardItem(tr("Color"));
+	// Color
+	QStandardItem* color = new QStandardItem(tr("Color"));
 	color->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
 
 	// Shown as a swatch next to the value, not as the text color: black
 	// text (the default) is unreadable on a dark palette.
-	QStandardItem *colora = new QStandardItem;
+	QStandardItem* colora = new QStandardItem;
 	colora->setData(deti->color(), Qt::DecorationRole);
 	colora->setData(deti->color(), Qt::EditRole);
-	colora->setData(DynamicElementTextModel::color, Qt::UserRole+1);
-	colora->setFlags(Qt::ItemIsSelectable
-			 | Qt::ItemIsEnabled
-			 | Qt::ItemIsEditable);
+	colora->setData(DynamicElementTextModel::color, Qt::UserRole + 1);
+	colora->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
 
 	qsi_list.clear();
 	qsi_list << color << colora;
 	qsi->appendRow(qsi_list);
-	
-		//Frame
-	QStandardItem *frame = new QStandardItem(tr("Frame"));
+
+	// Frame
+	QStandardItem* frame = new QStandardItem(tr("Frame"));
 	frame->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-	
-	QStandardItem *frame_a = new QStandardItem;
+
+	QStandardItem* frame_a = new QStandardItem;
 	frame_a->setCheckable(true);
-	frame_a->setCheckState(deti->frame()? Qt::Checked : Qt::Unchecked);
-	frame_a->setData(DynamicElementTextModel::frame, Qt::UserRole+1);
-	frame_a->setFlags(Qt::ItemIsSelectable
-			  | Qt::ItemIsEnabled
-			  | Qt::ItemIsUserCheckable);
-	
+	frame_a->setCheckState(deti->frame() ? Qt::Checked : Qt::Unchecked);
+	frame_a->setData(DynamicElementTextModel::frame, Qt::UserRole + 1);
+	frame_a->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+
 	qsi_list.clear();
 	qsi_list << frame << frame_a;
 	qsi->appendRow(qsi_list);
-	
-		//Width and height, each on two rows: the value, and whether it
-		//is fixed. Not fixed, the field follows the text and the value
-		//only shows the size it has now.
-	const struct {
-		QString name, fixed_name, tip;
-		int value_type, fixed_type;
-	} sizes[] = {
-		{tr("Width"), tr("Width fixed"),
-		 tr("Ticked, the text field keeps the width above and the text wraps inside it. Not ticked, it is as wide as the text."),
-		 DynamicElementTextModel::textWidth, DynamicElementTextModel::textWidthFixed},
-		{tr("Height"), tr("Height fixed"),
-		 tr("Ticked, the text field keeps the height above and the lines that do not fit are cut off. Not ticked, it is as high as the text."),
-		 DynamicElementTextModel::textHeight, DynamicElementTextModel::textHeightFixed}
-	};
-	for (const auto &size : sizes)
+
+	// Width and height, each on two rows: the value, and whether it
+	// is fixed. Not fixed, the field follows the text and the value
+	// only shows the size it has now.
+	const struct
 	{
-		QStandardItem *name = new QStandardItem(size.name);
+		QString name, fixed_name, tip;
+		int		value_type, fixed_type;
+	} sizes[] = {
+		{tr("Width"),
+		 tr("Width fixed"),
+		 tr("Ticked, the text field keeps the width above and the text wraps "
+			"inside it. Not ticked, it is as wide as the text."),
+		 DynamicElementTextModel::textWidth,
+		 DynamicElementTextModel::textWidthFixed},
+		{tr("Height"),
+		 tr("Height fixed"),
+		 tr("Ticked, the text field keeps the height above and the lines that "
+			"do not fit are cut off. Not ticked, it is as high as the text."),
+		 DynamicElementTextModel::textHeight,
+		 DynamicElementTextModel::textHeightFixed}};
+	for (const auto& size : sizes)
+	{
+		QStandardItem* name = new QStandardItem(size.name);
 		name->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-		QStandardItem *value = new QStandardItem;
-		value->setData(size.value_type, Qt::UserRole+1);
+		QStandardItem* value = new QStandardItem;
+		value->setData(size.value_type, Qt::UserRole + 1);
 		qsi_list.clear();
 		qsi_list << name << value;
 		qsi->appendRow(qsi_list);
 
-		QStandardItem *fixed_name = new QStandardItem(size.fixed_name);
+		QStandardItem* fixed_name = new QStandardItem(size.fixed_name);
 		fixed_name->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
 		fixed_name->setToolTip(size.tip);
-		QStandardItem *fixed = new QStandardItem;
+		QStandardItem* fixed = new QStandardItem;
 		fixed->setCheckable(true);
 		fixed->setToolTip(size.tip);
-		fixed->setData(size.fixed_type, Qt::UserRole+1);
-		fixed->setFlags(Qt::ItemIsSelectable
-				  | Qt::ItemIsEnabled
-				  | Qt::ItemIsUserCheckable);
+		fixed->setData(size.fixed_type, Qt::UserRole + 1);
+		fixed->setFlags(
+			Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
 		qsi_list.clear();
 		qsi_list << fixed_name << fixed;
 		qsi->appendRow(qsi_list);
 	}
 	setSizeItems(qsi, deti);
-	
-	if(deti->parentGroup() == nullptr)
+
+	if (deti->parentGroup() == nullptr)
 	{
-			//X pos
-		QStandardItem *x_pos = new QStandardItem(tr("Position X"));
+		// X pos
+		QStandardItem* x_pos = new QStandardItem(tr("Position X"));
 		x_pos->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-		
-		QStandardItem *x_pos_a = new QStandardItem;
+
+		QStandardItem* x_pos_a = new QStandardItem;
 		x_pos_a->setData(deti->anchorPos().x(), Qt::EditRole);
-		x_pos_a->setData(DynamicElementTextModel::pos, Qt::UserRole+1);
-		x_pos_a->setFlags(Qt::ItemIsSelectable
-				  | Qt::ItemIsEnabled
-				  | Qt::ItemIsEditable);
-		
+		x_pos_a->setData(DynamicElementTextModel::pos, Qt::UserRole + 1);
+		x_pos_a->setFlags(
+			Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+
 		qsi_list.clear();
 		qsi_list << x_pos << x_pos_a;
 		qsi->appendRow(qsi_list);
-		
-			//Y pos
-		QStandardItem *y_pos = new QStandardItem(tr("Position Y"));
+
+		// Y pos
+		QStandardItem* y_pos = new QStandardItem(tr("Position Y"));
 		y_pos->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-		
-		QStandardItem *y_pos_a = new QStandardItem;
+
+		QStandardItem* y_pos_a = new QStandardItem;
 		y_pos_a->setData(deti->anchorPos().y(), Qt::EditRole);
-		y_pos_a->setData(DynamicElementTextModel::pos, Qt::UserRole+1);
-		y_pos_a->setFlags(Qt::ItemIsSelectable
-				  | Qt::ItemIsEnabled
-				  | Qt::ItemIsEditable);
-		
+		y_pos_a->setData(DynamicElementTextModel::pos, Qt::UserRole + 1);
+		y_pos_a->setFlags(
+			Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+
 		qsi_list.clear();
 		qsi_list << y_pos << y_pos_a;
 		qsi->appendRow(qsi_list);
-		
-			//Rotation
-		QStandardItem *rot = new QStandardItem(tr("Rotation"));
+
+		// Rotation
+		QStandardItem* rot = new QStandardItem(tr("Rotation"));
 		rot->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-		
-		QStandardItem *rot_a = new QStandardItem;
+
+		QStandardItem* rot_a = new QStandardItem;
 		rot_a->setData(deti->rotation(), Qt::EditRole);
-		rot_a->setData(DynamicElementTextModel::rotation,
-			       Qt::UserRole+1);
-		rot_a->setFlags(Qt::ItemIsSelectable
-				| Qt::ItemIsEnabled
-				| Qt::ItemIsEditable);
-		
+		rot_a->setData(DynamicElementTextModel::rotation, Qt::UserRole + 1);
+		rot_a->setFlags(
+			Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+
 		qsi_list.clear();
 		qsi_list << rot << rot_a;
 		qsi->appendRow(qsi_list);
 
-			//keep visual rotation
+		// keep visual rotation
 		auto keep_rotation = new QStandardItem(tr("Maintain visual rotation"));
 		keep_rotation->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
 
 		auto keep_rotation_a = new QStandardItem;
 		keep_rotation_a->setCheckable(true);
-		keep_rotation_a->setCheckState(deti->keepVisualRotation() ? Qt::Checked : Qt::Unchecked);
-		keep_rotation_a->setData(DynamicElementTextModel::keepVisualRotation, Qt::UserRole+1);
-		keep_rotation_a->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+		keep_rotation_a->setCheckState(
+			deti->keepVisualRotation() ? Qt::Checked : Qt::Unchecked);
+		keep_rotation_a->setData(
+			DynamicElementTextModel::keepVisualRotation,
+			Qt::UserRole + 1);
+		keep_rotation_a->setFlags(
+			Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
 
 		qsi_list.clear();
 		qsi_list << keep_rotation << keep_rotation_a;
 		qsi->appendRow(qsi_list);
 
-			//Alignment
-		QStandardItem *alignment = new QStandardItem(tr("Alignment"));
+		// Alignment
+		QStandardItem* alignment = new QStandardItem(tr("Alignment"));
 		alignment->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-		
-		QStandardItem *alignmenta = new QStandardItem(tr("Edit"));
-		alignmenta->setFlags(Qt::ItemIsSelectable
-				     | Qt::ItemIsEnabled
-				     | Qt::ItemIsEditable);
-		alignmenta->setData(DynamicElementTextModel::txtAlignment,
-				    Qt::UserRole+1);
-		alignmenta->setData(QVariant::fromValue(deti->alignment()),
-				    Qt::UserRole+2);
-		
+
+		QStandardItem* alignmenta = new QStandardItem(tr("Edit"));
+		alignmenta->setFlags(
+			Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+		alignmenta->setData(
+			DynamicElementTextModel::txtAlignment,
+			Qt::UserRole + 1);
+		alignmenta->setData(
+			QVariant::fromValue(deti->alignment()),
+			Qt::UserRole + 2);
+
 		qsi_list.clear();
 		qsi_list << alignment << alignmenta;
 		qsi->appendRow(qsi_list);
+
+		// Layer
+		QStandardItem* layer_item = new QStandardItem(tr("Layer"));
+		layer_item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+
+		QStandardItem* layer_item_val = new QStandardItem;
+		const QString  current_layer  = DrawingLayers::layerOf(deti);
+		layer_item_val->setText(
+			current_layer.isEmpty() ? tr("<None>") : current_layer);
+		layer_item_val->setData(current_layer, Qt::UserRole + 2);
+		layer_item_val->setData(
+			DynamicElementTextModel::layer,
+			Qt::UserRole + 1);
+		layer_item_val->setFlags(
+			Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+
+		qsi_list.clear();
+		qsi_list << layer_item << layer_item_val;
+		qsi->appendRow(qsi_list);
 	}
-	
-	
+
 	qsi_list.clear();
-	QStandardItem *empty_qsi = new QStandardItem(0);
+	QStandardItem* empty_qsi = new QStandardItem(0);
 	empty_qsi->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
 	qsi_list << qsi << empty_qsi;
-	
+
 	m_texts_list.insert(deti, qsi);
 	blockSignals(true);
 	enableSourceText(deti, deti->textFrom());
 	blockSignals(false);
 	setConnection(deti, true);
-	
+
 	return qsi_list;
 }
 
@@ -469,7 +527,7 @@ QList<QStandardItem *> DynamicElementTextModel::itemsForText(
 	@brief DynamicElementTextModel::addText
 	@param deti
 */
-void DynamicElementTextModel::addText(DynamicElementTextItem *deti)
+void DynamicElementTextModel::addText(DynamicElementTextItem* deti)
 {
 	this->appendRow(itemsForText(deti));
 }
@@ -478,10 +536,9 @@ void DynamicElementTextModel::addText(DynamicElementTextItem *deti)
 	@brief DynamicElementTextModel::removeText
 	@param deti
 */
-void DynamicElementTextModel::removeText(DynamicElementTextItem *deti)
+void DynamicElementTextModel::removeText(DynamicElementTextItem* deti)
 {
-	if (!m_texts_list.contains(deti))
-		return;
+	if (! m_texts_list.contains(deti)) return;
 
 	QModelIndex text_index = m_texts_list.value(deti)->index();
 	this->removeRow(text_index.row(), text_index.parent());
@@ -496,14 +553,12 @@ void DynamicElementTextModel::removeText(DynamicElementTextItem *deti)
 	Index can be a child of an index associated with a text
 	and can be the column 0 or 1.
 */
-DynamicElementTextItem *DynamicElementTextModel::textFromIndex(
-		const QModelIndex &index) const
+DynamicElementTextItem*
+DynamicElementTextModel::textFromIndex(const QModelIndex& index) const
 {
-	if(!index.isValid())
-		return nullptr;
+	if (! index.isValid()) return nullptr;
 
-	if (QStandardItem *item = itemFromIndex(index))
-		return textFromItem(item);
+	if (QStandardItem* item = itemFromIndex(index)) return textFromItem(item);
 	else
 		return nullptr;
 }
@@ -516,47 +571,42 @@ DynamicElementTextItem *DynamicElementTextModel::textFromIndex(
 	and can be the column 0 or 1.
 	Note can return nullptr
 */
-DynamicElementTextItem *DynamicElementTextModel::textFromItem(
-		QStandardItem *item) const
+DynamicElementTextItem*
+DynamicElementTextModel::textFromItem(QStandardItem* item) const
 {
-	//Get the item of the column 0
-	if(item->column() == 1)
+	// Get the item of the column 0
+	if (item->column() == 1)
 	{
-		if(item->parent())
-			item = item->parent()->child(item->row(), 0);
+		if (item->parent()) item = item->parent()->child(item->row(), 0);
 		else
-			item = itemFromIndex(index(item->row(),0));
+			item = itemFromIndex(index(item->row(), 0));
 	}
-	//Item haven't got parent, so they can be only a text or a group
-	if(!item->parent()) 
+	// Item haven't got parent, so they can be only a text or a group
+	if (! item->parent())
 	{
-		if(m_texts_list.values().contains(item))
-			return m_texts_list.key(item);
+		if (m_texts_list.values().contains(item)) return m_texts_list.key(item);
 		else
 			return nullptr;
 	}
-	
-	
-	
-	QStandardItem *text_item = item;
-	while (text_item->parent())
-		text_item = text_item->parent();
-	
-	if (m_texts_list.values().contains(text_item)) //The item is a text
+
+	QStandardItem* text_item = item;
+	while (text_item->parent()) text_item = text_item->parent();
+
+	if (m_texts_list.values().contains(text_item)) // The item is a text
 		return m_texts_list.key(text_item);
-	else if (m_groups_list.values().contains(text_item)) //The item is a group
+	else if (m_groups_list.values().contains(text_item)) // The item is a group
 	{
-		QStandardItem *previous = item;
-		QStandardItem *top = item;
-			//At the end of the while, previous must be the text
-			//and top the group
-		while(top->parent())
+		QStandardItem* previous = item;
+		QStandardItem* top		= item;
+		// At the end of the while, previous must be the text
+		// and top the group
+		while (top->parent())
 		{
 			previous = top;
-			top = top->parent();
+			top		 = top->parent();
 		}
-		
-		if(m_texts_list.values().contains(previous))
+
+		if (m_texts_list.values().contains(previous))
 			return m_texts_list.key(previous);
 		else
 			return nullptr;
@@ -570,11 +620,10 @@ DynamicElementTextItem *DynamicElementTextModel::textFromItem(
 	@param text
 	@return the QModelIndex for text, or a default QModelIndex if not match
 */
-QModelIndex DynamicElementTextModel::indexFromText(
-		DynamicElementTextItem *text) const
+QModelIndex
+DynamicElementTextModel::indexFromText(DynamicElementTextItem* text) const
 {
-	if(m_texts_list.contains(text))
-		return m_texts_list.value(text)->index();
+	if (m_texts_list.contains(text)) return m_texts_list.value(text)->index();
 	else
 		return QModelIndex();
 }
@@ -588,142 +637,261 @@ QModelIndex DynamicElementTextModel::indexFromText(
 	In other word, if the returned QUndoCommand have no child,
 	that mean there is no change.
 */
-QUndoCommand *DynamicElementTextModel::undoForEditedText(
-		DynamicElementTextItem *deti,
-		QUndoCommand *parent_undo) const
+QUndoCommand* DynamicElementTextModel::undoForEditedText(
+	DynamicElementTextItem* deti, QUndoCommand* parent_undo) const
 {
-	
-	QUndoCommand *undo = nullptr;
-	if(parent_undo)
-		undo = parent_undo;
+
+	QUndoCommand* undo = nullptr;
+	if (parent_undo) undo = parent_undo;
 	else
 		undo = new QUndoCommand(tr("Edit an element text"));
-	
-	if (!m_texts_list.contains(deti))
-		return undo;
-	
-	QStandardItem *text_qsi = m_texts_list.value(deti);
-	
-	QString from = text_qsi->child(src_txt_row,1)->data(Qt::DisplayRole).toString();
-	if ((from == tr("User text")) && (deti->textFrom() != DynamicElementTextItem::UserText))
-		new QPropertyUndoCommand(deti, "textFrom", QVariant(deti->textFrom()), QVariant(DynamicElementTextItem::UserText), undo);
-	else if ((from == tr("Element information")) && (deti->textFrom() != DynamicElementTextItem::ElementInfo))
-		new QPropertyUndoCommand(deti, "textFrom", QVariant(deti->textFrom()), QVariant(DynamicElementTextItem::ElementInfo), undo);
-	else if ((from == tr("Composite text")) && (deti->textFrom() != DynamicElementTextItem::CompositeText))
-		new QPropertyUndoCommand(deti, "textFrom", QVariant(deti->textFrom()), QVariant(DynamicElementTextItem::CompositeText), undo);
-	
-	if(from == tr("User text"))
+
+	if (! m_texts_list.contains(deti)) return undo;
+
+	QStandardItem* text_qsi = m_texts_list.value(deti);
+
+	QString from =
+		text_qsi->child(src_txt_row, 1)->data(Qt::DisplayRole).toString();
+	if ((from == tr("User text"))
+		&& (deti->textFrom() != DynamicElementTextItem::UserText))
+		new QPropertyUndoCommand(
+			deti,
+			"textFrom",
+			QVariant(deti->textFrom()),
+			QVariant(DynamicElementTextItem::UserText),
+			undo);
+	else if (
+		(from == tr("Element information"))
+		&& (deti->textFrom() != DynamicElementTextItem::ElementInfo))
+		new QPropertyUndoCommand(
+			deti,
+			"textFrom",
+			QVariant(deti->textFrom()),
+			QVariant(DynamicElementTextItem::ElementInfo),
+			undo);
+	else if (
+		(from == tr("Composite text"))
+		&& (deti->textFrom() != DynamicElementTextItem::CompositeText))
+		new QPropertyUndoCommand(
+			deti,
+			"textFrom",
+			QVariant(deti->textFrom()),
+			QVariant(DynamicElementTextItem::CompositeText),
+			undo);
+
+	if (from == tr("User text"))
 	{
-		QString text = text_qsi->child(usr_txt_row,1)->data(Qt::DisplayRole).toString();
+		QString text =
+			text_qsi->child(usr_txt_row, 1)->data(Qt::DisplayRole).toString();
 		if (text != deti->text())
-			new QPropertyUndoCommand(deti, "text", QVariant(deti->text()), QVariant(text), undo);
+			new QPropertyUndoCommand(
+				deti,
+				"text",
+				QVariant(deti->text()),
+				QVariant(text),
+				undo);
 	}
 	else if (from == tr("Element information"))
 	{
-		QString info_name = text_qsi->child(info_txt_row,1)->data(Qt::UserRole+2).toString();
-		if(info_name != deti->infoName())
-			new QPropertyUndoCommand(deti, "infoName", QVariant(deti->infoName()), QVariant(info_name), undo);
+		QString info_name =
+			text_qsi->child(info_txt_row, 1)->data(Qt::UserRole + 2).toString();
+		if (info_name != deti->infoName())
+			new QPropertyUndoCommand(
+				deti,
+				"infoName",
+				QVariant(deti->infoName()),
+				QVariant(info_name),
+				undo);
 	}
 	else if (from == tr("Composite text"))
 	{
-		QString composite_text = text_qsi->child(compo_txt_row,1)->data(Qt::UserRole+2).toString();
-		if(composite_text != deti->compositeText())
-			new QPropertyUndoCommand(deti, "compositeText", QVariant(deti->compositeText()), QVariant(composite_text), undo);
+		QString composite_text = text_qsi->child(compo_txt_row, 1)
+									 ->data(Qt::UserRole + 2)
+									 .toString();
+		if (composite_text != deti->compositeText())
+			new QPropertyUndoCommand(
+				deti,
+				"compositeText",
+				QVariant(deti->compositeText()),
+				QVariant(composite_text),
+				undo);
 	}
-	
-	int fs = text_qsi->child(size_txt_row,1)->data(Qt::EditRole).toInt();
+
+	int fs = text_qsi->child(size_txt_row, 1)->data(Qt::EditRole).toInt();
 	if (fs != deti->font().pointSize())
 	{
 		QFont font = deti->font();
 		font.setPointSize(fs);
-		QPropertyUndoCommand *quc = new QPropertyUndoCommand(deti, "font", QVariant(deti->font()), QVariant(font), undo);
+		QPropertyUndoCommand* quc = new QPropertyUndoCommand(
+			deti,
+			"font",
+			QVariant(deti->font()),
+			QVariant(font),
+			undo);
 		quc->setText(tr("Change the size of an element text"));
 	}
 
-	QFont font = text_qsi->child(font_txt_row, 1)->data(Qt::UserRole+2).value<QFont>();
+	QFont font =
+		text_qsi->child(font_txt_row, 1)->data(Qt::UserRole + 2).value<QFont>();
 	if (font != deti->font())
 	{
-		QPropertyUndoCommand *quc = new QPropertyUndoCommand(deti, "font", QVariant(deti->font()), QVariant(font), undo);
+		QPropertyUndoCommand* quc = new QPropertyUndoCommand(
+			deti,
+			"font",
+			QVariant(deti->font()),
+			QVariant(font),
+			undo);
 		quc->setText(tr("Change the font of an element text"));
 	}
-	
-	QColor color = text_qsi->child(color_txt_row,1)->data(Qt::EditRole).value<QColor>();
-	if(color != deti->color())
+
+	QColor color =
+		text_qsi->child(color_txt_row, 1)->data(Qt::EditRole).value<QColor>();
+	if (color != deti->color())
 	{
-		QUndoCommand *quc = new QPropertyUndoCommand(deti, "color", QVariant(deti->color()), QVariant(color), undo);
+		QUndoCommand* quc = new QPropertyUndoCommand(
+			deti,
+			"color",
+			QVariant(deti->color()),
+			QVariant(color),
+			undo);
 		quc->setText(tr("Change the color of an element text"));
 	}
-	
-	bool frame = text_qsi->child(frame_txt_row,1)->checkState() == Qt::Checked? true : false;
-	if(frame != deti->frame())
+
+	bool frame =
+		text_qsi->child(frame_txt_row, 1)->checkState() == Qt::Checked ? true :
+																		 false;
+	if (frame != deti->frame())
 	{
-		QUndoCommand *quc = new QPropertyUndoCommand(deti, "frame", QVariant(deti->frame()), QVariant(frame), undo);
+		QUndoCommand* quc = new QPropertyUndoCommand(
+			deti,
+			"frame",
+			QVariant(deti->frame()),
+			QVariant(frame),
+			undo);
 		quc->setText(tr("Modify the frame of an element text"));
 	}
-	
-	qreal text_width = text_qsi->child(width_fix_row, 1)->checkState() == Qt::Checked
-			? text_qsi->child(width_txt_row, 1)->data(Qt::EditRole).toDouble() : -1;
-	if(text_width != deti->textWidth())
+
+	qreal text_width =
+		text_qsi->child(width_fix_row, 1)->checkState() == Qt::Checked ?
+			text_qsi->child(width_txt_row, 1)->data(Qt::EditRole).toDouble() :
+			-1;
+	if (text_width != deti->textWidth())
 	{
-		QPropertyUndoCommand *quc = new QPropertyUndoCommand(deti, "textWidth", QVariant(deti->textWidth()), QVariant(text_width), undo);
+		QPropertyUndoCommand* quc = new QPropertyUndoCommand(
+			deti,
+			"textWidth",
+			QVariant(deti->textWidth()),
+			QVariant(text_width),
+			undo);
 		quc->setAnimated(true, false);
 		quc->setText(tr("Change the width of an element text"));
 	}
 
-	qreal text_height = text_qsi->child(height_fix_row, 1)->checkState() == Qt::Checked
-			? text_qsi->child(height_txt_row, 1)->data(Qt::EditRole).toDouble() : -1;
-	if(text_height != deti->textHeight())
+	qreal text_height =
+		text_qsi->child(height_fix_row, 1)->checkState() == Qt::Checked ?
+			text_qsi->child(height_txt_row, 1)->data(Qt::EditRole).toDouble() :
+			-1;
+	if (text_height != deti->textHeight())
 	{
-		QPropertyUndoCommand *quc = new QPropertyUndoCommand(deti, "textHeight", QVariant(deti->textHeight()), QVariant(text_height), undo);
+		QPropertyUndoCommand* quc = new QPropertyUndoCommand(
+			deti,
+			"textHeight",
+			QVariant(deti->textHeight()),
+			QVariant(text_height),
+			undo);
 		quc->setText(tr("Change the height of an element text"));
 	}
-	
-		//When text is in a group, they're isn't item for position of the text
-	if(text_qsi->child(x_txt_row,1) && text_qsi->child(y_txt_row,1))
+
+	// When text is in a group, they're isn't item for position of the text
+	if (text_qsi->child(x_txt_row, 1) && text_qsi->child(y_txt_row, 1))
 	{
-		QPointF p(text_qsi->child(x_txt_row,1)->data(Qt::EditRole).toDouble(),
-				  text_qsi->child(y_txt_row,1)->data(Qt::EditRole).toDouble());
-		if(p != deti->anchorPos())
+		QPointF p(
+			text_qsi->child(x_txt_row, 1)->data(Qt::EditRole).toDouble(),
+			text_qsi->child(y_txt_row, 1)->data(Qt::EditRole).toDouble());
+		if (p != deti->anchorPos())
 		{
-			QPropertyUndoCommand *quc = new QPropertyUndoCommand(deti, "anchorPos", QVariant(deti->anchorPos()), QVariant(p), undo);
+			QPropertyUndoCommand* quc = new QPropertyUndoCommand(
+				deti,
+				"anchorPos",
+				QVariant(deti->anchorPos()),
+				QVariant(p),
+				undo);
 			quc->setAnimated(true, false);
 			quc->setText(tr("Move an item text"));
 		}
 	}
-		//When text is in a group, they're isn't item for the rotation of the text
-	if(text_qsi->child(rot_txt_row,1))
+	// When text is in a group, they're isn't item for the rotation of the text
+	if (text_qsi->child(rot_txt_row, 1))
 	{
-		qreal rot = text_qsi->child(rot_txt_row,1)->data(Qt::EditRole).toDouble();
+		qreal rot =
+			text_qsi->child(rot_txt_row, 1)->data(Qt::EditRole).toDouble();
 		rot = QET::correctAngle(rot);
-		if(rot != deti->rotation())
+		if (rot != deti->rotation())
 		{
-			QPropertyUndoCommand *quc = new QPropertyUndoCommand(deti, "rotation", QVariant(deti->rotation()), QVariant(rot), undo);
+			QPropertyUndoCommand* quc = new QPropertyUndoCommand(
+				deti,
+				"rotation",
+				QVariant(deti->rotation()),
+				QVariant(rot),
+				undo);
 			quc->setAnimated(true, false);
 			quc->setText(tr("Rotate element text"));
 		}
 	}
 
-	if (text_qsi->child(keep_rot_row,1))
+	if (text_qsi->child(keep_rot_row, 1))
 	{
-		bool keep_rot = text_qsi->child(keep_rot_row, 1)->checkState() == Qt::Checked? true : false;
+		bool keep_rot =
+			text_qsi->child(keep_rot_row, 1)->checkState() == Qt::Checked ?
+				true :
+				false;
 		if (keep_rot != deti->keepVisualRotation())
 		{
-			auto qpuc = new QPropertyUndoCommand(deti, "keepVisualRotation", QVariant(deti->keepVisualRotation()), QVariant(keep_rot), undo);
+			auto qpuc = new QPropertyUndoCommand(
+				deti,
+				"keepVisualRotation",
+				QVariant(deti->keepVisualRotation()),
+				QVariant(keep_rot),
+				undo);
 			qpuc->setText(tr("Change the way item text stays rotated"));
 		}
 	}
-		
-		//When text is in a groupe, they're isn't item for alignment of the text
-	if(text_qsi->child(align_txt_row, 1))
+
+	// When text is in a groupe, they're isn't item for alignment of the text
+	if (text_qsi->child(align_txt_row, 1))
 	{
-		Qt::Alignment alignment = text_qsi->child(align_txt_row, 1)->data(Qt::UserRole+2).value<Qt::Alignment>();
+		Qt::Alignment alignment = text_qsi->child(align_txt_row, 1)
+									  ->data(Qt::UserRole + 2)
+									  .value<Qt::Alignment>();
 		if (alignment != deti->alignment())
 		{
-			QPropertyUndoCommand *quc = new QPropertyUndoCommand(deti, "alignmentAtAnchor", QVariant(deti->alignment()), QVariant(alignment), undo);
+			QPropertyUndoCommand* quc = new QPropertyUndoCommand(
+				deti,
+				"alignmentAtAnchor",
+				QVariant(deti->alignment()),
+				QVariant(alignment),
+				undo);
 			quc->setText(tr("Modify the alignment of an element text"));
 		}
 	}
-	
+
+	if (text_qsi->child(layer_txt_row, 1))
+	{
+		const QString new_layer = text_qsi->child(layer_txt_row, 1)
+									  ->data(Qt::UserRole + 2)
+									  .toString();
+		if (new_layer != deti->layer())
+		{
+			auto* quc = new QPropertyUndoCommand(
+				deti,
+				"layer",
+				QVariant(deti->layer()),
+				QVariant(new_layer),
+				undo);
+			quc->setText(tr("Change the layer of an element text"));
+		}
+	}
+
 	return undo;
 }
 
@@ -732,68 +900,122 @@ QUndoCommand *DynamicElementTextModel::undoForEditedText(
 	@param group
 	@param parent_undo
 	@return A QUndoCommand that describe all changes made for group.
-	Each change made for group is append as a child of the returned QUndoCommand.
-	In other word, if the returned QUndoCommand have no child,
-	that mean there is no change.
+	Each change made for group is append as a child of the returned
+   QUndoCommand. In other word, if the returned QUndoCommand have no child, that
+   mean there is no change.
 */
-QUndoCommand *DynamicElementTextModel::undoForEditedGroup(
-		ElementTextItemGroup *group,
-		QUndoCommand *parent_undo) const
+QUndoCommand* DynamicElementTextModel::undoForEditedGroup(
+	ElementTextItemGroup* group, QUndoCommand* parent_undo) const
 {
-	QUndoCommand *undo = nullptr;
-	if(parent_undo)
-		undo = parent_undo;
+	QUndoCommand* undo = nullptr;
+	if (parent_undo) undo = parent_undo;
 	else
 		undo = new QUndoCommand(tr("Edit a group of texts"));
-	
-	if (!m_groups_list.contains(group))
-		return undo;
-	
-	QStandardItem *group_qsi = m_groups_list.value(group);
-	
-	QString alignment = group_qsi->child(align_grp_row,1)->data(Qt::DisplayRole).toString();
-	if((alignment == tr("Left")) && (group->alignment() != Qt::AlignLeft))
-		new QPropertyUndoCommand(group, "alignment", QVariant(group->alignment()), QVariant(Qt::AlignLeft), undo);
-	else if((alignment == tr("Right")) && (group->alignment() != Qt::AlignRight))
-		new QPropertyUndoCommand(group, "alignment", QVariant(group->alignment()), QVariant(Qt::AlignRight), undo);
-	else if((alignment == tr("Middle")) && (group->alignment() != Qt::AlignVCenter))
-		new QPropertyUndoCommand(group, "alignment", QVariant(group->alignment()), QVariant(Qt::AlignVCenter), undo);
-	
-	
-	if (group_qsi->child(hold_to_bottom_grp_row, 1)->checkState() == Qt::Unchecked)
+
+	if (! m_groups_list.contains(group)) return undo;
+
+	QStandardItem* group_qsi = m_groups_list.value(group);
+
+	QString alignment =
+		group_qsi->child(align_grp_row, 1)->data(Qt::DisplayRole).toString();
+	if ((alignment == tr("Left")) && (group->alignment() != Qt::AlignLeft))
+		new QPropertyUndoCommand(
+			group,
+			"alignment",
+			QVariant(group->alignment()),
+			QVariant(Qt::AlignLeft),
+			undo);
+	else if (
+		(alignment == tr("Right")) && (group->alignment() != Qt::AlignRight))
+		new QPropertyUndoCommand(
+			group,
+			"alignment",
+			QVariant(group->alignment()),
+			QVariant(Qt::AlignRight),
+			undo);
+	else if (
+		(alignment == tr("Middle")) && (group->alignment() != Qt::AlignVCenter))
+		new QPropertyUndoCommand(
+			group,
+			"alignment",
+			QVariant(group->alignment()),
+			QVariant(Qt::AlignVCenter),
+			undo);
+
+	if (group_qsi->child(hold_to_bottom_grp_row, 1)->checkState()
+		== Qt::Unchecked)
 	{
-		QPointF pos(group_qsi->child(x_grp_row,1)->data(Qt::EditRole).toDouble(),
-					group_qsi->child(y_grp_row,1)->data(Qt::EditRole).toDouble());
-		if(group->pos() != pos)
+		QPointF pos(
+			group_qsi->child(x_grp_row, 1)->data(Qt::EditRole).toDouble(),
+			group_qsi->child(y_grp_row, 1)->data(Qt::EditRole).toDouble());
+		if (group->pos() != pos)
 		{
-			QPropertyUndoCommand *qpuc = new QPropertyUndoCommand(group, "pos", QVariant(group->pos()), QVariant(pos), undo);
+			QPropertyUndoCommand* qpuc = new QPropertyUndoCommand(
+				group,
+				"pos",
+				QVariant(group->pos()),
+				QVariant(pos),
+				undo);
 			qpuc->setAnimated(true, false);
 		}
-		
-		qreal rotation = group_qsi->child(rot_grp_row,1)->data(Qt::EditRole).toDouble();
-		if(group->rotation() != rotation)
+
+		qreal rotation =
+			group_qsi->child(rot_grp_row, 1)->data(Qt::EditRole).toDouble();
+		if (group->rotation() != rotation)
 		{
-			QPropertyUndoCommand *qpuc = new QPropertyUndoCommand(group, "rotation", QVariant(group->rotation()), QVariant(rotation), undo);
+			QPropertyUndoCommand* qpuc = new QPropertyUndoCommand(
+				group,
+				"rotation",
+				QVariant(group->rotation()),
+				QVariant(rotation),
+				undo);
 			qpuc->setAnimated(true, false);
 		}
 	}
-	
-	int v_adjustment = group_qsi->child(adjust_grp_row,1)->data(Qt::EditRole).toInt();
-	if(group->verticalAdjustment() != v_adjustment)
-		new QPropertyUndoCommand(group, "verticalAdjustment", QVariant(group->verticalAdjustment()), QVariant(v_adjustment), undo);
-	
+
+	int v_adjustment =
+		group_qsi->child(adjust_grp_row, 1)->data(Qt::EditRole).toInt();
+	if (group->verticalAdjustment() != v_adjustment)
+		new QPropertyUndoCommand(
+			group,
+			"verticalAdjustment",
+			QVariant(group->verticalAdjustment()),
+			QVariant(v_adjustment),
+			undo);
+
 	QString name = group_qsi->data(Qt::DisplayRole).toString();
-	if(group->name() != name)
-		new QPropertyUndoCommand(group, "name", QVariant(group->name()), QVariant(name), undo);
-	
-	bool hold_to_bottom = group_qsi->child(hold_to_bottom_grp_row, 1)->checkState() == Qt::Checked? true : false;
-	if(group->holdToBottomPage() != hold_to_bottom)
-		new QPropertyUndoCommand(group, "holdToBottomPage", QVariant(group->holdToBottomPage()), QVariant(hold_to_bottom), undo);
-	
-	bool frame_ = group_qsi->child(frame_grp_row, 1)->checkState() == Qt::Checked? true : false;
-	if(group->frame() != frame_)
-		new QPropertyUndoCommand(group, "frame", QVariant(group->frame()), QVariant(frame_), undo);
-		
+	if (group->name() != name)
+		new QPropertyUndoCommand(
+			group,
+			"name",
+			QVariant(group->name()),
+			QVariant(name),
+			undo);
+
+	bool hold_to_bottom =
+		group_qsi->child(hold_to_bottom_grp_row, 1)->checkState()
+				== Qt::Checked ?
+			true :
+			false;
+	if (group->holdToBottomPage() != hold_to_bottom)
+		new QPropertyUndoCommand(
+			group,
+			"holdToBottomPage",
+			QVariant(group->holdToBottomPage()),
+			QVariant(hold_to_bottom),
+			undo);
+
+	bool frame_ =
+		group_qsi->child(frame_grp_row, 1)->checkState() == Qt::Checked ? true :
+																		  false;
+	if (group->frame() != frame_)
+		new QPropertyUndoCommand(
+			group,
+			"frame",
+			QVariant(group->frame()),
+			QVariant(frame_),
+			undo);
+
 	return undo;
 }
 
@@ -802,146 +1024,139 @@ QUndoCommand *DynamicElementTextModel::undoForEditedGroup(
 	Add a text item group to this model
 	@param group
 */
-void DynamicElementTextModel::addGroup(ElementTextItemGroup *group)
+void DynamicElementTextModel::addGroup(ElementTextItemGroup* group)
 {
-	if(m_groups_list.contains(group))
-		return;
-	
-		//Group
-	QStandardItem *grp = new QStandardItem(group->name());
-	grp->setFlags(Qt::ItemIsSelectable
-		      | Qt::ItemIsEnabled
-		      | Qt::ItemIsDropEnabled
-		      | Qt::ItemIsEditable);
+	if (m_groups_list.contains(group)) return;
+
+	// Group
+	QStandardItem* grp = new QStandardItem(group->name());
+	grp->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDropEnabled
+		| Qt::ItemIsEditable);
 	grp->setIcon(QET::Icons::textGroup);
-	
-	QStandardItem *empty_qsi = new QStandardItem(0);
+
+	QStandardItem* empty_qsi = new QStandardItem(0);
 	empty_qsi->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-	
-	QList<QStandardItem *> qsi_list;
+
+	QList<QStandardItem*> qsi_list;
 	qsi_list << grp << empty_qsi;
-	
+
 	this->insertRow(0, qsi_list);
 	m_groups_list.insert(group, grp);
-	
-		//Alignment
-	QStandardItem *alignment = new QStandardItem(tr("Alignment"));
+
+	// Alignment
+	QStandardItem* alignment = new QStandardItem(tr("Alignment"));
 	alignment->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-	
+
 	QString text;
-	switch (group->alignment()) {
-		case Qt::AlignLeft:    text = tr("Left"); break;
-		case Qt::AlignRight:   text = tr("Right"); break;
-		case Qt::AlignVCenter: text = tr("Middle"); break;
-		default: break;}
-	
-	QStandardItem *alignment_a = new QStandardItem(text);
-	alignment_a->setData(DynamicElementTextModel::grpAlignment,
-			     Qt::UserRole+1);
-	alignment_a->setFlags(Qt::ItemIsSelectable
-			      | Qt::ItemIsEnabled
-			      | Qt::ItemIsEditable);
+	switch (group->alignment())
+	{
+	case Qt::AlignLeft: text = tr("Left"); break;
+	case Qt::AlignRight: text = tr("Right"); break;
+	case Qt::AlignVCenter: text = tr("Middle"); break;
+	default: break;
+	}
+
+	QStandardItem* alignment_a = new QStandardItem(text);
+	alignment_a->setData(
+		DynamicElementTextModel::grpAlignment,
+		Qt::UserRole + 1);
+	alignment_a->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
 	qsi_list.clear();
 	qsi_list << alignment << alignment_a;
 	grp->appendRow(qsi_list);
-	
-		//X pos
-	QStandardItem *x_pos = new QStandardItem(tr("Position X"));
+
+	// X pos
+	QStandardItem* x_pos = new QStandardItem(tr("Position X"));
 	x_pos->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-	
-	QStandardItem *x_pos_a = new QStandardItem;
+
+	QStandardItem* x_pos_a = new QStandardItem;
 	x_pos_a->setData(group->pos().x(), Qt::EditRole);
-	x_pos_a->setData(DynamicElementTextModel::grpPos, Qt::UserRole+1);
-	x_pos_a->setFlags(Qt::ItemIsSelectable
-			  | Qt::ItemIsEnabled
-			  | Qt::ItemIsEditable);
-	
+	x_pos_a->setData(DynamicElementTextModel::grpPos, Qt::UserRole + 1);
+	x_pos_a->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+
 	qsi_list.clear();
 	qsi_list << x_pos << x_pos_a;
 	grp->appendRow(qsi_list);
-	
-		//Y pos
-	QStandardItem *y_pos = new QStandardItem(tr("Position Y"));
+
+	// Y pos
+	QStandardItem* y_pos = new QStandardItem(tr("Position Y"));
 	y_pos->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-	
-	QStandardItem *y_pos_a = new QStandardItem;
+
+	QStandardItem* y_pos_a = new QStandardItem;
 	y_pos_a->setData(group->pos().y(), Qt::EditRole);
-	y_pos_a->setData(DynamicElementTextModel::grpPos, Qt::UserRole+1);
-	y_pos_a->setFlags(Qt::ItemIsSelectable
-			  | Qt::ItemIsEnabled
-			  | Qt::ItemIsEditable);
-	
+	y_pos_a->setData(DynamicElementTextModel::grpPos, Qt::UserRole + 1);
+	y_pos_a->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+
 	qsi_list.clear();
 	qsi_list << y_pos << y_pos_a;
 	grp->appendRow(qsi_list);
-	
-		//Rotation
-	QStandardItem *rot = new QStandardItem(tr("Rotation"));
+
+	// Rotation
+	QStandardItem* rot = new QStandardItem(tr("Rotation"));
 	rot->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-	
-	QStandardItem *rot_a = new QStandardItem;
+
+	QStandardItem* rot_a = new QStandardItem;
 	rot_a->setData(group->rotation(), Qt::EditRole);
-	rot_a->setData(DynamicElementTextModel::grpRotation, Qt::UserRole+1);
-	rot_a->setFlags(Qt::ItemIsSelectable
-			| Qt::ItemIsEnabled
-			| Qt::ItemIsEditable);
+	rot_a->setData(DynamicElementTextModel::grpRotation, Qt::UserRole + 1);
+	rot_a->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
 	qsi_list.clear();
 	qsi_list << rot << rot_a;
 	grp->appendRow(qsi_list);
-	
-		//Vertical adjustment
-	QStandardItem *v_adj = new QStandardItem(tr("Vertical adjustment"));
+
+	// Vertical adjustment
+	QStandardItem* v_adj = new QStandardItem(tr("Vertical adjustment"));
 	v_adj->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-	
-	QStandardItem *v_adj_a = new QStandardItem;
+
+	QStandardItem* v_adj_a = new QStandardItem;
 	v_adj_a->setData(group->verticalAdjustment(), Qt::EditRole);
-	v_adj_a->setData(DynamicElementTextModel::grpVAdjust, Qt::UserRole+1);
-	v_adj_a->setFlags(Qt::ItemIsSelectable
-			  | Qt::ItemIsEnabled
-			  | Qt::ItemIsEditable);
+	v_adj_a->setData(DynamicElementTextModel::grpVAdjust, Qt::UserRole + 1);
+	v_adj_a->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
 	qsi_list.clear();
 	qsi_list << v_adj << v_adj_a;
 	grp->appendRow(qsi_list);
-	
-		//Frame
-	QStandardItem *frame_ = new QStandardItem(tr("Frame"));
+
+	// Frame
+	QStandardItem* frame_ = new QStandardItem(tr("Frame"));
 	frame_->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-	
-	QStandardItem *frame_a = new QStandardItem;
+
+	QStandardItem* frame_a = new QStandardItem;
 	frame_a->setCheckable(true);
-	frame_a->setCheckState(group->frame()? Qt::Checked : Qt::Unchecked);
-	frame_a->setData(DynamicElementTextModel::grpFrame, Qt::UserRole+1);
-	frame_a->setFlags(Qt::ItemIsSelectable
-			  | Qt::ItemIsEnabled
-			  | Qt::ItemIsUserCheckable);
+	frame_a->setCheckState(group->frame() ? Qt::Checked : Qt::Unchecked);
+	frame_a->setData(DynamicElementTextModel::grpFrame, Qt::UserRole + 1);
+	frame_a->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
 	qsi_list.clear();
 	qsi_list << frame_ << frame_a;
 	grp->appendRow(qsi_list);
-	
-	
-		//Hold to the bottom of the page
-	QStandardItem *hold_bottom = new QStandardItem(tr("Keep at the bottom of the page"));
+
+	// Hold to the bottom of the page
+	QStandardItem* hold_bottom =
+		new QStandardItem(tr("Keep at the bottom of the page"));
 	hold_bottom->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-	
-	QStandardItem *hold_bottom_a = new QStandardItem();
+
+	QStandardItem* hold_bottom_a = new QStandardItem();
 	hold_bottom_a->setCheckable(true);
-	hold_bottom_a->setCheckState(group->holdToBottomPage()
-				     ? Qt::Checked
-				     : Qt::Unchecked);
-	hold_bottom_a->setData(DynamicElementTextModel::grpHoldBottom,
-			       Qt::UserRole+1);
-	hold_bottom_a->setFlags(Qt::ItemIsSelectable
-				| Qt::ItemIsEnabled
-				| Qt::ItemIsUserCheckable);
+	hold_bottom_a->setCheckState(
+		group->holdToBottomPage() ? Qt::Checked : Qt::Unchecked);
+	hold_bottom_a->setData(
+		DynamicElementTextModel::grpHoldBottom,
+		Qt::UserRole + 1);
+	hold_bottom_a->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
 	qsi_list.clear();
 	qsi_list << hold_bottom << hold_bottom_a;
 	grp->appendRow(qsi_list);
-	
 
-		//Add the texts of the group
-	for(DynamicElementTextItem *deti : group->texts())
+	// Add the texts of the group
+	for (DynamicElementTextItem* deti : group->texts())
 	{
-		QStandardItem *group_item = m_groups_list.value(group);
+		QStandardItem* group_item = m_groups_list.value(group);
 		group_item->appendRow(itemsForText(deti));
 	}
 	setConnection(group, true);
@@ -953,9 +1168,9 @@ void DynamicElementTextModel::addGroup(ElementTextItemGroup *group)
 	Remove the text item group from this model
 	@param group
 */
-void DynamicElementTextModel::removeGroup(ElementTextItemGroup *group)
+void DynamicElementTextModel::removeGroup(ElementTextItemGroup* group)
 {
-	if(m_groups_list.contains(group))
+	if (m_groups_list.contains(group))
 	{
 		QModelIndex group_index = m_groups_list.value(group)->index();
 		this->removeRow(group_index.row(), group_index.parent());
@@ -970,22 +1185,22 @@ void DynamicElementTextModel::removeGroup(ElementTextItemGroup *group)
 	@param deti
 	@param group
 */
-void DynamicElementTextModel::addTextToGroup(DynamicElementTextItem *deti,
-					     ElementTextItemGroup *group)
+void DynamicElementTextModel::addTextToGroup(
+	DynamicElementTextItem* deti, ElementTextItemGroup* group)
 {
-	QStandardItem *group_item = m_groups_list.value(group);
+	QStandardItem* group_item = m_groups_list.value(group);
 	group_item->appendRow(itemsForText(deti));
 }
 
-void DynamicElementTextModel::removeTextFromGroup(DynamicElementTextItem *deti,
-						  ElementTextItemGroup *group)
+void DynamicElementTextModel::removeTextFromGroup(
+	DynamicElementTextItem* deti, ElementTextItemGroup* group)
 {
 	Q_UNUSED(group)
-	
-	if(m_texts_list.contains(deti))
+
+	if (m_texts_list.contains(deti))
 	{
-		QStandardItem *text_item = m_texts_list.value(deti);
-		QModelIndex text_index = indexFromItem(text_item);
+		QStandardItem* text_item  = m_texts_list.value(deti);
+		QModelIndex	   text_index = indexFromItem(text_item);
 		removeRow(text_index.row(), text_index.parent());
 		m_texts_list.remove(deti);
 	}
@@ -998,14 +1213,12 @@ void DynamicElementTextModel::removeTextFromGroup(DynamicElementTextItem *deti,
 	Index can be a child of an index associated with a group
 	and can be the column 0 or 1.
 */
-ElementTextItemGroup *DynamicElementTextModel::groupFromIndex(
-		const QModelIndex &index) const
+ElementTextItemGroup*
+DynamicElementTextModel::groupFromIndex(const QModelIndex& index) const
 {
-	if(!index.isValid())
-		return nullptr;
+	if (! index.isValid()) return nullptr;
 
-	if (QStandardItem *item = itemFromIndex(index))
-		return groupFromItem(item);
+	if (QStandardItem* item = itemFromIndex(index)) return groupFromItem(item);
 	else
 		return nullptr;
 }
@@ -1017,23 +1230,20 @@ ElementTextItemGroup *DynamicElementTextModel::groupFromIndex(
 	item can be a child of an item associated with a group
 	and can be the column 0 or 1.
 */
-ElementTextItemGroup *DynamicElementTextModel::groupFromItem(
-		QStandardItem *item) const
+ElementTextItemGroup*
+DynamicElementTextModel::groupFromItem(QStandardItem* item) const
 {
-	//Get the item of the column 0
-	if(item->column() == 1)
+	// Get the item of the column 0
+	if (item->column() == 1)
 	{
-		if(item->parent())
-			item = item->parent()->child(item->row(), 0);
+		if (item->parent()) item = item->parent()->child(item->row(), 0);
 		else
-			item = itemFromIndex(index(item->row(),0));
+			item = itemFromIndex(index(item->row(), 0));
 	}
-	
-	while (item->parent())
-		item = item->parent();
-	
-	if(m_groups_list.values().contains(item))
-		return m_groups_list.key(item);
+
+	while (item->parent()) item = item->parent();
+
+	if (m_groups_list.values().contains(item)) return m_groups_list.key(item);
 	else
 		return nullptr;
 }
@@ -1044,10 +1254,10 @@ ElementTextItemGroup *DynamicElementTextModel::groupFromItem(
 	@return The index associated to the group group
 	or a default QModelIndex if not match
 */
-QModelIndex DynamicElementTextModel::indexFromGroup(
-		ElementTextItemGroup *group) const
+QModelIndex
+DynamicElementTextModel::indexFromGroup(ElementTextItemGroup* group) const
 {
-	if(m_groups_list.contains(group))
+	if (m_groups_list.contains(group))
 		return m_groups_list.value(group)->index();
 	else
 		return QModelIndex();
@@ -1059,26 +1269,23 @@ QModelIndex DynamicElementTextModel::indexFromGroup(
 	@return True if index represents a text, both for the column 0 and 1.
 	Return false if index is a child of an index associated to a text.
 */
-bool DynamicElementTextModel::indexIsText(const QModelIndex &index) const
+bool DynamicElementTextModel::indexIsText(const QModelIndex& index) const
 {
-	QStandardItem *item = nullptr;
-	
-		//The item represent the second column
-	if(index.column() == 1)
+	QStandardItem* item = nullptr;
+
+	// The item represent the second column
+	if (index.column() == 1)
 	{
-		if(index.parent().isValid())
-			item = itemFromIndex(index.parent()
-					     .QModelIndex::model()->index(
-						     index.row(),
-						     0));
+		if (index.parent().isValid())
+			item = itemFromIndex(
+				index.parent().QModelIndex::model()->index(index.row(), 0));
 		else
-			item = itemFromIndex(this->index(index.row(),0));
+			item = itemFromIndex(this->index(index.row(), 0));
 	}
 	else
 		item = itemFromIndex(index);
 
-	if(item && m_texts_list.values().contains(item))
-		return true;
+	if (item && m_texts_list.values().contains(item)) return true;
 	else
 		return false;
 }
@@ -1089,77 +1296,75 @@ bool DynamicElementTextModel::indexIsText(const QModelIndex &index) const
 	@return True if index represents a group, both for the column 0 and 1.
 	Return false if index is a child of an index associated to a group.
 */
-bool DynamicElementTextModel::indexIsGroup(const QModelIndex &index) const
+bool DynamicElementTextModel::indexIsGroup(const QModelIndex& index) const
 {
-	QStandardItem *item = nullptr;
-	
-		//The item represent the second column
-	if(index.column() == 1)
+	QStandardItem* item = nullptr;
+
+	// The item represent the second column
+	if (index.column() == 1)
 	{
-		if(index.parent().isValid())
-			item = itemFromIndex(index.parent()
-					     .QModelIndex::model()->index(
-						     index.row(),0));
+		if (index.parent().isValid())
+			item = itemFromIndex(
+				index.parent().QModelIndex::model()->index(index.row(), 0));
 		else
-			item = itemFromIndex(this->index(index.row(),0));
+			item = itemFromIndex(this->index(index.row(), 0));
 	}
 	else
 		item = itemFromIndex(index);
 
-	if(item && m_groups_list.values().contains(item))
-		return true;
+	if (item && m_groups_list.values().contains(item)) return true;
 	else
 		return false;
 }
 
 bool DynamicElementTextModel::canDropMimeData(
-		const QMimeData *data,
-		Qt::DropAction action,
-		int row,
-		int column,
-		const QModelIndex &parent) const
+	const QMimeData*   data,
+	Qt::DropAction	   action,
+	int				   row,
+	int				   column,
+	const QModelIndex& parent) const
 {
 	Q_UNUSED(action);
 
-	if(data->hasFormat("application/x-qet-element-text-uuid"))
+	if (data->hasFormat("application/x-qet-element-text-uuid"))
 	{
 		QModelIndex index;
-		if(parent.isValid() && row != -1 && column !=1) //Insert in child of parent
+		if (parent.isValid() && row != -1
+			&& column != 1) // Insert in child of parent
 			index = parent.QModelIndex::model()->index(row, column);
-		else if (parent.isValid() && row == -1 && column == -1) //Drop in parent
+		else if (parent.isValid() && row == -1 && column == -1) // Drop in
+																// parent
 			index = parent;
-		
+
 		QUuid uuid(data->text());
 
-			//The data is drop in a group
-		if(indexIsInGroup(index))
+		// The data is drop in a group
+		if (indexIsInGroup(index))
 		{
-				//Data is dragged from a text direct child of element
-			for(DynamicElementTextItem *text : m_element.data()->dynamicTextItems())
-				if(text->uuid() == uuid)
-					return true;
-				//Data is dragged from a text in a group
-			for(ElementTextItemGroup *group : m_element.data()->textGroups())
+			// Data is dragged from a text direct child of element
+			for (DynamicElementTextItem* text :
+				 m_element.data()->dynamicTextItems())
+				if (text->uuid() == uuid) return true;
+			// Data is dragged from a text in a group
+			for (ElementTextItemGroup* group : m_element.data()->textGroups())
 			{
-				for(DynamicElementTextItem *text : group->texts())
-					if(text->uuid() == uuid)
-						return true;
+				for (DynamicElementTextItem* text : group->texts())
+					if (text->uuid() == uuid) return true;
 			}
-			
+
 			return false;
-						
 		}
-		else //The data is not drop in a group, then the action must be a drag of text from a group to the element
+		else // The data is not drop in a group, then the action must be a drag
+			 // of text from a group to the element
 		{
-			for(ElementTextItemGroup *group : m_element.data()->textGroups())
+			for (ElementTextItemGroup* group : m_element.data()->textGroups())
 			{
-				for(DynamicElementTextItem *text : group->texts())
-					if(text->uuid() == uuid)
-						return true;
+				for (DynamicElementTextItem* text : group->texts())
+					if (text->uuid() == uuid) return true;
 			}
 		}
 	}
-	
+
 	return false;
 }
 
@@ -1173,128 +1378,139 @@ bool DynamicElementTextModel::canDropMimeData(
 	@return In any case return false,
 	for overwrite the default behavior of model.
 */
-bool DynamicElementTextModel::dropMimeData(const QMimeData *data,
-					   Qt::DropAction action,
-					   int row,
-					   int column,
-					   const QModelIndex &parent)
+bool DynamicElementTextModel::dropMimeData(
+	const QMimeData*   data,
+	Qt::DropAction	   action,
+	int				   row,
+	int				   column,
+	const QModelIndex& parent)
 {
 	Q_UNUSED(action)
-	
-	if(data->hasFormat("application/x-qet-element-text-uuid"))
-	{		
-		QUuid uuid(data->text());
-		DynamicElementTextItem *deti = nullptr;
-		ElementTextItemGroup *group = nullptr;
-		
+
+	if (data->hasFormat("application/x-qet-element-text-uuid"))
+	{
+		QUuid					uuid(data->text());
+		DynamicElementTextItem* deti  = nullptr;
+		ElementTextItemGroup*	group = nullptr;
+
 		QModelIndex index;
-		if(parent.isValid() && row != -1 && column !=1) //Insert in child of parent
+		if (parent.isValid() && row != -1
+			&& column != 1) // Insert in child of parent
 			index = parent.QModelIndex::model()->index(row, column);
-		else if (parent.isValid() && row == -1 && column == -1) //Drop in parent
+		else if (parent.isValid() && row == -1 && column == -1) // Drop in
+																// parent
 			index = parent;
 
-			//Darg and drop in a group of text
-		if(indexIsInGroup(index))
+		// Darg and drop in a group of text
+		if (indexIsInGroup(index))
 		{
-				//The dragged text is a direct child of element
-			for(DynamicElementTextItem *text : m_element.data()->dynamicTextItems())
+			// The dragged text is a direct child of element
+			for (DynamicElementTextItem* text :
+				 m_element.data()->dynamicTextItems())
 			{
-				if(text->uuid() == uuid)
+				if (text->uuid() == uuid)
 				{
-					deti = text;
+					deti  = text;
 					group = groupFromIndex(index);
-					
-					if(group && deti) //Text successfully added in a group	
+
+					if (group && deti) // Text successfully added in a group
 					{
-						m_element.data()->diagram()->undoStack().push(new AddTextToGroupCommand(deti, group));
+						m_element.data()->diagram()->undoStack().push(
+							new AddTextToGroupCommand(deti, group));
 						return true;
 					}
 				}
 			}
-			
-				//The dragged text is in a group
-			for(ElementTextItemGroup *grp : m_element.data()->textGroups())
+
+			// The dragged text is in a group
+			for (ElementTextItemGroup* grp : m_element.data()->textGroups())
 			{
-				for(DynamicElementTextItem *text : grp->texts())
+				for (DynamicElementTextItem* text : grp->texts())
 				{
-					if(text->uuid() == uuid)
+					if (text->uuid() == uuid)
 					{
-						deti = text;
+						deti  = text;
 						group = groupFromIndex(index);
-						
-							//Text successfully moved from a group to another group
-						if(group && deti)
+
+						// Text successfully moved from a group to another group
+						if (group && deti)
 						{
-							QUndoStack &stack = m_element.data()->diagram()->undoStack();
-							stack.beginMacro(tr("Move a text to another group"));
-							stack.push(new RemoveTextFromGroupCommand(deti, grp));
+							QUndoStack& stack =
+								m_element.data()->diagram()->undoStack();
+							stack.beginMacro(
+								tr("Move a text to another group"));
+							stack.push(
+								new RemoveTextFromGroupCommand(deti, grp));
 							stack.push(new AddTextToGroupCommand(deti, group));
 							stack.endMacro();
-							
+
 							return true;
 						}
 					}
 				}
 			}
-				
+
 			return false;
 		}
-		else //Drag and drop in anaother place 
+		else // Drag and drop in anaother place
 		{
-				//Get the dropped text
-			for(ElementTextItemGroup *grp : m_element.data()->textGroups())
+			// Get the dropped text
+			for (ElementTextItemGroup* grp : m_element.data()->textGroups())
 			{
-				for(DynamicElementTextItem *text : grp->texts())
+				for (DynamicElementTextItem* text : grp->texts())
 				{
-					if(text->uuid() == uuid)
+					if (text->uuid() == uuid)
 					{
-						deti = text;
+						deti  = text;
 						group = grp;
 						break;
 					}
 				}
-				if(deti)
-					break;
+				if (deti) break;
 			}
-			
-			if(deti && group) //Text successfully removed from group
+
+			if (deti && group) // Text successfully removed from group
 			{
-				m_element.data()->diagram()->undoStack().push((new RemoveTextFromGroupCommand(deti, group)));
+				m_element.data()->diagram()->undoStack().push(
+					(new RemoveTextFromGroupCommand(deti, group)));
 				return true;
 			}
-			
+
 			return false;
 		}
 	}
-	
+
 	return false;
 }
 
-QMimeData *DynamicElementTextModel::mimeData(const QModelIndexList &indexes) const
-{	
+QMimeData*
+DynamicElementTextModel::mimeData(const QModelIndexList& indexes) const
+{
 	QModelIndex index = indexes.first();
 	if (index.isValid())
 	{
-		QStandardItem *item =  itemFromIndex(index);
-		if(item)
+		QStandardItem* item = itemFromIndex(index);
+		if (item)
 		{
-			DynamicElementTextItem *deti = m_texts_list.key(item);
-			if(deti)
+			DynamicElementTextItem* deti = m_texts_list.key(item);
+			if (deti)
 			{
-				QMimeData *mime_data = new QMimeData();
+				QMimeData* mime_data = new QMimeData();
 				mime_data->setText(deti->uuid().toString());
-				mime_data->setData("application/x-qet-element-text-uuid", deti->uuid().toString().toLatin1());
+				mime_data->setData(
+					"application/x-qet-element-text-uuid",
+					deti->uuid().toString().toLatin1());
 				return mime_data;
 			}
 		}
 	}
-	
+
 	return QStandardItemModel::mimeData(indexes);
 }
 
 /**
 	@brief DynamicElementTextModel::mimeTypes
-	@return 
+	@return
 */
 QStringList DynamicElementTextModel::mimeTypes() const
 {
@@ -1311,47 +1527,45 @@ QStringList DynamicElementTextModel::mimeTypes() const
 	@param tf
 */
 void DynamicElementTextModel::enableSourceText(
-		DynamicElementTextItem *deti,
-		DynamicElementTextItem::TextFrom tf)
+	DynamicElementTextItem* deti, DynamicElementTextItem::TextFrom tf)
 {
-	if (!m_texts_list.contains(deti))
-		return;
+	if (! m_texts_list.contains(deti)) return;
 
-	QStandardItem *qsi = m_texts_list.value(deti);
-	
+	QStandardItem* qsi = m_texts_list.value(deti);
+
 	bool usr = false, info = false, compo = false;
-	
-	switch (tf) {
-		case DynamicElementTextItem::UserText: usr = true; break;
-		case DynamicElementTextItem::ElementInfo: info = true; break;
-		case DynamicElementTextItem::CompositeText: compo = true;break;
+
+	switch (tf)
+	{
+	case DynamicElementTextItem::UserText: usr = true; break;
+	case DynamicElementTextItem::ElementInfo: info = true; break;
+	case DynamicElementTextItem::CompositeText: compo = true; break;
 	}
 
-		//User text
-	qsi->child(usr_txt_row,0)->setEnabled(usr);
-	qsi->child(usr_txt_row,1)->setEnabled(usr);
-		//Info text
-	qsi->child(info_txt_row,0)->setEnabled(info);
-	qsi->child(info_txt_row,1)->setEnabled(info);
-		//Composite text
-	qsi->child(compo_txt_row,0)->setEnabled(compo);
-	qsi->child(compo_txt_row,1)->setEnabled(compo);
+	// User text
+	qsi->child(usr_txt_row, 0)->setEnabled(usr);
+	qsi->child(usr_txt_row, 1)->setEnabled(usr);
+	// Info text
+	qsi->child(info_txt_row, 0)->setEnabled(info);
+	qsi->child(info_txt_row, 1)->setEnabled(info);
+	// Composite text
+	qsi->child(compo_txt_row, 0)->setEnabled(compo);
+	qsi->child(compo_txt_row, 1)->setEnabled(compo);
 }
 
 /**
 	@brief DynamicElementTextModel::enableGroupRotation
-	Enable/disable the item "group rotation" according the option hold to bottom 
+	Enable/disable the item "group rotation" according the option hold to bottom
 	@param group
 */
 void DynamicElementTextModel::enableGroupRotationAndPos(
-		ElementTextItemGroup *group)
+	ElementTextItemGroup* group)
 {
-	if(!m_groups_list.contains(group))
-		return;
-	
-	QStandardItem *qsi = m_groups_list.value(group);
-	
-	if(group->holdToBottomPage())
+	if (! m_groups_list.contains(group)) return;
+
+	QStandardItem* qsi = m_groups_list.value(group);
+
+	if (group->holdToBottomPage())
 	{
 		qsi->child(x_grp_row, 0)->setFlags(Qt::ItemIsSelectable);
 		qsi->child(x_grp_row, 1)->setFlags(Qt::ItemIsSelectable);
@@ -1362,99 +1576,117 @@ void DynamicElementTextModel::enableGroupRotationAndPos(
 	}
 	else
 	{
-		qsi->child(x_grp_row, 0)->setFlags(Qt::ItemIsSelectable
-						   | Qt::ItemIsEnabled);
-		qsi->child(x_grp_row, 1)->setFlags(Qt::ItemIsSelectable
-						   | Qt::ItemIsEnabled
-						   | Qt::ItemIsEditable);
-		qsi->child(y_grp_row, 0)->setFlags(Qt::ItemIsSelectable
-						   | Qt::ItemIsEnabled);
-		qsi->child(y_grp_row, 1)->setFlags(Qt::ItemIsSelectable
-						   | Qt::ItemIsEnabled
-						   | Qt::ItemIsEditable);
-		qsi->child(rot_grp_row, 0)->setFlags(Qt::ItemIsSelectable
-						     | Qt::ItemIsEnabled);
-		qsi->child(rot_grp_row, 1)->setFlags(Qt::ItemIsSelectable
-						     | Qt::ItemIsEnabled
-						     | Qt::ItemIsEditable);
+		qsi->child(x_grp_row, 0)
+			->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+		qsi->child(x_grp_row, 1)
+			->setFlags(
+				Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+		qsi->child(y_grp_row, 0)
+			->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+		qsi->child(y_grp_row, 1)
+			->setFlags(
+				Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+		qsi->child(rot_grp_row, 0)
+			->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+		qsi->child(rot_grp_row, 1)
+			->setFlags(
+				Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
 	}
 }
 
-void DynamicElementTextModel::itemDataChanged(QStandardItem *qsi)
+void DynamicElementTextModel::itemDataChanged(QStandardItem* qsi)
 {
-	DynamicElementTextItem *deti = textFromItem(qsi);
-	ElementTextItemGroup *etig = groupFromItem(qsi);
-	if (!deti && !etig)
-		return;
-	
-	if(deti)
+	DynamicElementTextItem* deti = textFromItem(qsi);
+	ElementTextItemGroup*	etig = groupFromItem(qsi);
+	if (! deti && ! etig) return;
+
+	if (deti)
 	{
-		QStandardItem *text_qsi = m_texts_list.value(deti);
+		QStandardItem* text_qsi = m_texts_list.value(deti);
 		DiagramContext dc;
-		if(deti->elementUseForInfo())
+		if (deti->elementUseForInfo())
 			dc = deti->elementUseForInfo()->elementInformations();
-		
+
 		if (qsi->data().toInt() == textFrom)
 		{
 			QString from = qsi->data(Qt::DisplayRole).toString();
-			
+
 			if (from == tr("User text"))
 			{
 				enableSourceText(deti, DynamicElementTextItem::UserText);
-				text_qsi->setData(text_qsi->child(usr_txt_row,1)->data(Qt::DisplayRole).toString());
+				text_qsi->setData(text_qsi->child(usr_txt_row, 1)
+									  ->data(Qt::DisplayRole)
+									  .toString());
 			}
 			else if (from == tr("Element information"))
 			{
 				enableSourceText(deti, DynamicElementTextItem::ElementInfo);
-				QString info = text_qsi->child(info_txt_row,1)->data(Qt::UserRole+2).toString();
+				QString info = text_qsi->child(info_txt_row, 1)
+								   ->data(Qt::UserRole + 2)
+								   .toString();
 				text_qsi->setData(dc.value(info), Qt::DisplayRole);
 			}
 			else
 			{
 				enableSourceText(deti, DynamicElementTextItem::CompositeText);
-				QString compo = text_qsi->child(compo_txt_row,1)->data(Qt::UserRole+2).toString();
-				text_qsi->setData(autonum::AssignVariables::replaceVariable(compo, dc, deti->elementUseForInfo()), Qt::DisplayRole);
+				QString compo = text_qsi->child(compo_txt_row, 1)
+									->data(Qt::UserRole + 2)
+									.toString();
+				text_qsi->setData(
+					autonum::AssignVariables::replaceVariable(
+						compo,
+						dc,
+						deti->elementUseForInfo()),
+					Qt::DisplayRole);
 			}
-			
-			
 		}
 		else if (qsi->data().toInt() == userText)
 		{
 			QString text = qsi->data(Qt::DisplayRole).toString();
 			text_qsi->setData(text, Qt::DisplayRole);
 		}
-		else if (qsi->data().toInt() == textWidthFixed || qsi->data().toInt() == textHeightFixed)
+		else if (
+			qsi->data().toInt() == textWidthFixed
+			|| qsi->data().toInt() == textHeightFixed)
 		{
-				//The value can be edited as soon as it is fixed
-			const int row = qsi->data().toInt() == textWidthFixed ? width_txt_row : height_txt_row;
-			if (QStandardItem *value = text_qsi->child(row, 1)) {
+			// The value can be edited as soon as it is fixed
+			const int row = qsi->data().toInt() == textWidthFixed ?
+								width_txt_row :
+								height_txt_row;
+			if (QStandardItem* value = text_qsi->child(row, 1))
+			{
 				Qt::ItemFlags flags = Qt::ItemIsSelectable | Qt::ItemIsEnabled;
 				if (qsi->checkState() == Qt::Checked)
 					flags |= Qt::ItemIsEditable;
-				if (value->flags() != flags)
-					value->setFlags(flags);
+				if (value->flags() != flags) value->setFlags(flags);
 			}
 		}
 		else if (qsi->data().toInt() == infoText && deti->elementUseForInfo())
 		{
-			QString info = qsi->data(Qt::UserRole+2).toString();
+			QString info = qsi->data(Qt::UserRole + 2).toString();
 			text_qsi->setData(dc.value(info), Qt::DisplayRole);
 		}
-		else if (qsi->data().toInt() == compositeText && deti->elementUseForInfo())
+		else if (
+			qsi->data().toInt() == compositeText && deti->elementUseForInfo())
 		{
-			QString compo = qsi->data(Qt::UserRole+2).toString();
-			text_qsi->setData(autonum::AssignVariables::replaceVariable(compo, dc, deti->elementUseForInfo()), Qt::DisplayRole);
+			QString compo = qsi->data(Qt::UserRole + 2).toString();
+			text_qsi->setData(
+				autonum::AssignVariables::replaceVariable(
+					compo,
+					dc,
+					deti->elementUseForInfo()),
+				Qt::DisplayRole);
 		}
 	}
-	
-	//We emit the signal only if qsi is in the second column,
-	//because the data are stored on this column
-	//the first column is use only for display the title of the property,
-	//except for the name of texts group
-	if((m_groups_list.values().contains(qsi) || qsi->column() == 1)
-			&& !m_block_dataChanged)
+
+	// We emit the signal only if qsi is in the second column,
+	// because the data are stored on this column
+	// the first column is use only for display the title of the property,
+	// except for the name of texts group
+	if ((m_groups_list.values().contains(qsi) || qsi->column() == 1)
+		&& ! m_block_dataChanged)
 		emit dataChanged();
-	if(deti) deti->updateXref();
+	if (deti) deti->updateXref();
 }
 
 /**
@@ -1465,36 +1697,76 @@ void DynamicElementTextModel::itemDataChanged(QStandardItem *qsi)
 	@param deti - text to setup connection
 	@param set - true = set connection - false unset connection
 */
-void DynamicElementTextModel::setConnection(DynamicElementTextItem *deti, bool set)
+void DynamicElementTextModel::setConnection(
+	DynamicElementTextItem* deti, bool set)
 {
-	if(set)
+	if (set)
 	{
-		if(m_hash_text_connect.contains(deti))
-			return;
-		
+		if (m_hash_text_connect.contains(deti)) return;
+
 		QList<QMetaObject::Connection> connection_list;
-		connection_list << connect(deti, &DynamicElementTextItem::colorChanged,    [deti,this](){this->updateDataFromText(deti, color);});
-		connection_list << connect(deti, &DynamicElementTextItem::fontChanged,     [deti,this](){this->updateDataFromText(deti, font);});
-		connection_list << connect(deti, &DynamicElementTextItem::textFromChanged, [deti,this](){this->updateDataFromText(deti, textFrom);});
-		connection_list << connect(deti, &DynamicElementTextItem::textChanged,     [deti,this](){this->updateDataFromText(deti, userText);});
-		connection_list << connect(deti, &DynamicElementTextItem::infoNameChanged, [deti,this](){this->updateDataFromText(deti, infoText);});
-		connection_list << connect(deti, &DynamicElementTextItem::xChanged,        [deti,this](){this->updateDataFromText(deti, pos);});
-		connection_list << connect(deti, &DynamicElementTextItem::yChanged,        [deti,this](){this->updateDataFromText(deti, pos);});
-		connection_list << connect(deti, &DynamicElementTextItem::frameChanged,    [deti,this](){this->updateDataFromText(deti, frame);});
-		connection_list << connect(deti, &DynamicElementTextItem::rotationChanged, [deti,this](){this->updateDataFromText(deti, rotation);});
-		connection_list << connect(deti, &DynamicElementTextItem::textWidthChanged,[deti,this](){this->updateDataFromText(deti, textWidth);});
-		connection_list << connect(deti, &DynamicElementTextItem::textHeightChanged,[deti,this](){this->updateDataFromText(deti, textHeight);});
-		connection_list << connect(deti, &DynamicElementTextItem::compositeTextChanged, [deti, this]() {this->updateDataFromText(deti, compositeText);});
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::colorChanged,
+			[deti, this]() { this->updateDataFromText(deti, color); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::fontChanged,
+			[deti, this]() { this->updateDataFromText(deti, font); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::textFromChanged,
+			[deti, this]() { this->updateDataFromText(deti, textFrom); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::textChanged,
+			[deti, this]() { this->updateDataFromText(deti, userText); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::infoNameChanged,
+			[deti, this]() { this->updateDataFromText(deti, infoText); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::xChanged,
+			[deti, this]() { this->updateDataFromText(deti, pos); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::yChanged,
+			[deti, this]() { this->updateDataFromText(deti, pos); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::frameChanged,
+			[deti, this]() { this->updateDataFromText(deti, frame); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::rotationChanged,
+			[deti, this]() { this->updateDataFromText(deti, rotation); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::textWidthChanged,
+			[deti, this]() { this->updateDataFromText(deti, textWidth); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::textHeightChanged,
+			[deti, this]() { this->updateDataFromText(deti, textHeight); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::compositeTextChanged,
+			[deti, this]() { this->updateDataFromText(deti, compositeText); });
+		connection_list << connect(
+			deti,
+			&DynamicElementTextItem::layerChanged,
+			[deti, this]() { this->updateDataFromText(deti, layer); });
 		m_hash_text_connect.insert(deti, connection_list);
 	}
 	else
 	{
-		if(!m_hash_text_connect.contains(deti))
-			return;
-		
-		for (const QMetaObject::Connection& con : m_hash_text_connect.value(deti))
+		if (! m_hash_text_connect.contains(deti)) return;
+
+		for (const QMetaObject::Connection& con :
+			 m_hash_text_connect.value(deti))
 			disconnect(con);
-		
+
 		m_hash_text_connect.remove(deti);
 	}
 }
@@ -1507,559 +1779,699 @@ void DynamicElementTextModel::setConnection(DynamicElementTextItem *deti, bool s
 	@param group group to setup the connection
 	@param set true = set connection - false unset connection
 */
-void DynamicElementTextModel::setConnection(ElementTextItemGroup *group, bool set)
+void DynamicElementTextModel::setConnection(
+	ElementTextItemGroup* group, bool set)
 {
-	if(set)
+	if (set)
 	{
-		if(m_hash_group_connect.contains(group))
-			return;
-		
+		if (m_hash_group_connect.contains(group)) return;
+
 		QList<QMetaObject::Connection> connection_list;
-		connection_list << connect(group, &ElementTextItemGroup::alignmentChanged, [group, this]() {this->updateDataFromGroup(group, grpAlignment);});
-		connection_list << connect(group, &ElementTextItemGroup::rotationChanged, [group, this]() {this->updateDataFromGroup(group, grpRotation);});
-		connection_list << connect(group, &ElementTextItemGroup::verticalAdjustmentChanged, [group, this]() {this->updateDataFromGroup(group, grpVAdjust);});
-		connection_list << connect(group, &ElementTextItemGroup::verticalAdjustmentChanged, [group, this]() {this->updateDataFromGroup(group, grpName);});
-		connection_list << connect(group, &ElementTextItemGroup::holdToBottomPageChanged, [group, this]() {this->updateDataFromGroup(group, grpHoldBottom);});
-		connection_list << connect(group, &ElementTextItemGroup::xChanged, [group, this]() {this->updateDataFromGroup(group, grpPos);});
-		connection_list << connect(group, &ElementTextItemGroup::yChanged, [group, this]() {this->updateDataFromGroup(group, grpPos);});
-		connection_list << connect(group, &ElementTextItemGroup::frameChanged, [group, this]() {this->updateDataFromGroup(group, grpFrame);});
-		
+		connection_list << connect(
+			group,
+			&ElementTextItemGroup::alignmentChanged,
+			[group, this]()
+			{ this->updateDataFromGroup(group, grpAlignment); });
+		connection_list << connect(
+			group,
+			&ElementTextItemGroup::rotationChanged,
+			[group, this]() { this->updateDataFromGroup(group, grpRotation); });
+		connection_list << connect(
+			group,
+			&ElementTextItemGroup::verticalAdjustmentChanged,
+			[group, this]() { this->updateDataFromGroup(group, grpVAdjust); });
+		connection_list << connect(
+			group,
+			&ElementTextItemGroup::verticalAdjustmentChanged,
+			[group, this]() { this->updateDataFromGroup(group, grpName); });
+		connection_list << connect(
+			group,
+			&ElementTextItemGroup::holdToBottomPageChanged,
+			[group, this]()
+			{ this->updateDataFromGroup(group, grpHoldBottom); });
+		connection_list << connect(
+			group,
+			&ElementTextItemGroup::xChanged,
+			[group, this]() { this->updateDataFromGroup(group, grpPos); });
+		connection_list << connect(
+			group,
+			&ElementTextItemGroup::yChanged,
+			[group, this]() { this->updateDataFromGroup(group, grpPos); });
+		connection_list << connect(
+			group,
+			&ElementTextItemGroup::frameChanged,
+			[group, this]() { this->updateDataFromGroup(group, grpFrame); });
+
 		m_hash_group_connect.insert(group, connection_list);
 	}
 	else
 	{
-		if(!m_hash_group_connect.contains(group))
-			return;
-		
-		for (const QMetaObject::Connection& con : m_hash_group_connect.value(group))
+		if (! m_hash_group_connect.contains(group)) return;
+
+		for (const QMetaObject::Connection& con :
+			 m_hash_group_connect.value(group))
 			disconnect(con);
-		
+
 		m_hash_group_connect.remove(group);
 	}
 }
 
-void DynamicElementTextModel::updateDataFromText(DynamicElementTextItem *deti,
-						 ValueType type)
+void DynamicElementTextModel::updateDataFromText(
+	DynamicElementTextItem* deti, ValueType type)
 {
-	QStandardItem *qsi = m_texts_list.value(deti);
-	if (!qsi)
-		return;
-	
+	QStandardItem* qsi = m_texts_list.value(deti);
+	if (! qsi) return;
+
 	m_block_dataChanged = true;
-	
+
 	switch (type)
 	{
-		case textFrom:
+	case textFrom:
+	{
+		switch (deti->textFrom())
 		{
-			switch (deti->textFrom())
-			{
-				case DynamicElementTextItem::UserText: qsi->child(0,1)->setData(tr("User text"), Qt::DisplayRole); break;
-				case DynamicElementTextItem::ElementInfo : qsi->child(0,1)->setData(tr("Element information"), Qt::DisplayRole); break;
-				case DynamicElementTextItem::CompositeText : qsi->child(0,1)->setData(tr("Composite text"), Qt::DisplayRole); break;
-			}
-			enableSourceText(deti, deti->textFrom());
-			qsi->setData(deti->toPlainText(), Qt::DisplayRole);
+		case DynamicElementTextItem::UserText:
+			qsi->child(0, 1)->setData(tr("User text"), Qt::DisplayRole);
+			break;
+		case DynamicElementTextItem::ElementInfo:
+			qsi->child(0, 1)->setData(
+				tr("Element information"),
+				Qt::DisplayRole);
+			break;
+		case DynamicElementTextItem::CompositeText:
+			qsi->child(0, 1)->setData(tr("Composite text"), Qt::DisplayRole);
 			break;
 		}
-		case userText:
+		enableSourceText(deti, deti->textFrom());
+		qsi->setData(deti->toPlainText(), Qt::DisplayRole);
+		break;
+	}
+	case userText:
+	{
+		qsi->setData(deti->toPlainText(), Qt::DisplayRole);
+		qsi->child(usr_txt_row, 1)
+			->setData(deti->toPlainText(), Qt::DisplayRole);
+		qsi->setData(deti->toPlainText(), Qt::DisplayRole);
+		break;
+	}
+	case infoText:
+	{
+		qsi->setData(deti->toPlainText(), Qt::DisplayRole);
+		QString info_name = deti->infoName();
+		qsi->child(info_txt_row, 1)->setData(info_name, Qt::UserRole + 2);
+		qsi->child(info_txt_row, 1)
+			->setData(infoDisplayName(info_name), Qt::DisplayRole);
+		break;
+	}
+	case compositeText:
+	{
+		qsi->setData(deti->toPlainText(), Qt::DisplayRole);
+		qsi->child(compo_txt_row, 1)
+			->setData(deti->compositeText(), Qt::UserRole + 2);
+		qsi->child(compo_txt_row, 1)
+			->setData(deti->toPlainText(), Qt::DisplayRole);
+		qsi->setData(deti->toPlainText(), Qt::DisplayRole);
+		break;
+	}
+	case size:
+		// qsi->child(size_txt_row,1)->setData(deti->fontSize(), Qt::EditRole);
+		break;
+	case font:
+	{
+		QFont f(deti->font());
+		qsi->child(font_txt_row, 1)->setData(f.family(), Qt::EditRole);
+		qsi->child(font_txt_row, 1)->setData(f, Qt::UserRole + 2);
+		qsi->child(size_txt_row, 1)->setData(f.pointSize(), Qt::EditRole);
+		break;
+	}
+	case color:
+	{
+		qsi->child(color_txt_row, 1)->setData(deti->color(), Qt::EditRole);
+		qsi->child(color_txt_row, 1)
+			->setData(deti->color(), Qt::DecorationRole);
+		break;
+	}
+	case pos:
+	{
+		if (qsi->child(x_txt_row, 1))
+			qsi->child(x_txt_row, 1)
+				->setData(deti->anchorPos().x(), Qt::EditRole);
+		if (qsi->child(y_txt_row, 1))
+			qsi->child(y_txt_row, 1)
+				->setData(deti->anchorPos().y(), Qt::EditRole);
+		break;
+	}
+	case frame:
+	{
+		qsi->child(frame_txt_row, 1)
+			->setCheckState(deti->frame() ? Qt::Checked : Qt::Unchecked);
+		break;
+	}
+	case rotation:
+	{
+		if (qsi->child(rot_txt_row, 1))
+			qsi->child(rot_txt_row, 1)->setData(deti->rotation(), Qt::EditRole);
+		break;
+	}
+	case textWidth:
+	case textHeight:
+	{
+		setSizeItems(qsi, deti);
+		break;
+	}
+	case layer:
+	{
+		if (qsi->child(layer_txt_row, 1))
 		{
-			qsi->setData(deti->toPlainText(), Qt::DisplayRole);
-			qsi->child(usr_txt_row,1)->setData(deti->toPlainText(), Qt::DisplayRole);
-			qsi->setData(deti->toPlainText(), Qt::DisplayRole);
-			break;
+			const QString l = deti->layer();
+			qsi->child(layer_txt_row, 1)
+				->setText(l.isEmpty() ? tr("<None>") : l);
+			qsi->child(layer_txt_row, 1)->setData(l, Qt::UserRole + 2);
 		}
-		case infoText:
-		{
-			qsi->setData(deti->toPlainText(), Qt::DisplayRole);
-			QString info_name = deti->infoName();
-			qsi->child(info_txt_row,1)->setData(info_name, Qt::UserRole+2);
-			qsi->child(info_txt_row,1)->setData(infoDisplayName(info_name), Qt::DisplayRole);
-			break;
-		}
-		case compositeText:
-		{
-			qsi->setData(deti->toPlainText(), Qt::DisplayRole);
-			qsi->child(compo_txt_row,1)->setData(deti->compositeText(), Qt::UserRole+2);
-			qsi->child(compo_txt_row,1)->setData(deti->toPlainText(), Qt::DisplayRole);
-			qsi->setData(deti->toPlainText(), Qt::DisplayRole);
-			break;
-		}
-		case size:
-			//qsi->child(size_txt_row,1)->setData(deti->fontSize(), Qt::EditRole);
-			break;
-		case font:
-		{
-			QFont f(deti->font());
-			qsi->child(font_txt_row,1)->setData(f.family(), Qt::EditRole);
-			qsi->child(font_txt_row,1)->setData(f, Qt::UserRole+2);
-			qsi->child(size_txt_row,1)->setData(f.pointSize(), Qt::EditRole);
-			break;
-		}
-		case color:
-		{
-			qsi->child(color_txt_row,1)->setData(deti->color(), Qt::EditRole);
-			qsi->child(color_txt_row,1)->setData(deti->color(), Qt::DecorationRole);
-			break;
-		}
-		case pos:
-		{
-			if(qsi->child(x_txt_row,1))
-				qsi->child(x_txt_row,1)->setData(deti->anchorPos().x(), Qt::EditRole);
-			if(qsi->child(y_txt_row,1))
-				qsi->child(y_txt_row,1)->setData(deti->anchorPos().y(), Qt::EditRole);
-			break;
-		}
-		case frame:
-		{
-			qsi->child(frame_txt_row,1)->setCheckState(deti->frame()? Qt::Checked : Qt::Unchecked);
-			break;
-		}
-		case rotation:
-		{
-			if(qsi->child(rot_txt_row,1))
-				qsi->child(rot_txt_row,1)->setData(deti->rotation(), Qt::EditRole);
-			break;
-		}
-		case textWidth:
-		case textHeight:
-		{
-			setSizeItems(qsi, deti);
-			break;
-		}
-	default:break;
+		break;
+	}
+	default: break;
 	}
 
-		//Rotating or resizing the text moves its anchor point (Position X/Y)
+	// Rotating or resizing the text moves its anchor point (Position X/Y)
 	if ((type == rotation || type == textWidth || type == textHeight)
-		&& qsi->child(x_txt_row,1) && qsi->child(y_txt_row,1))
+		&& qsi->child(x_txt_row, 1) && qsi->child(y_txt_row, 1))
 	{
-		qsi->child(x_txt_row,1)->setData(deti->anchorPos().x(), Qt::EditRole);
-		qsi->child(y_txt_row,1)->setData(deti->anchorPos().y(), Qt::EditRole);
+		qsi->child(x_txt_row, 1)->setData(deti->anchorPos().x(), Qt::EditRole);
+		qsi->child(y_txt_row, 1)->setData(deti->anchorPos().y(), Qt::EditRole);
 	}
-	
+
 	m_block_dataChanged = false;
 }
 
 void DynamicElementTextModel::updateDataFromGroup(
-		ElementTextItemGroup *group,
-		DynamicElementTextModel::ValueType type)
+	ElementTextItemGroup* group, DynamicElementTextModel::ValueType type)
 {
-	QStandardItem *qsi = m_groups_list.value(group);
-	if (!qsi)
-		return;
-	
+	QStandardItem* qsi = m_groups_list.value(group);
+	if (! qsi) return;
+
 	m_block_dataChanged = true;
-	
+
 	switch (type)
 	{
-		case grpAlignment:
+	case grpAlignment:
+	{
+		switch (group->alignment())
 		{
-			switch (group->alignment())
-			{
-				case Qt::AlignLeft: qsi->child(align_grp_row,1)->setData(tr("Left"), Qt::DisplayRole); break;
-				case Qt::AlignRight : qsi->child(align_grp_row,1)->setData(tr("Right"), Qt::DisplayRole); break;
-				case Qt::AlignVCenter : qsi->child(align_grp_row,1)->setData(tr("Middle"), Qt::DisplayRole); break;
-				default: qsi->child(0,1)->setData("", Qt::DisplayRole); break;
-			}
-			 break;
+		case Qt::AlignLeft:
+			qsi->child(align_grp_row, 1)->setData(tr("Left"), Qt::DisplayRole);
+			break;
+		case Qt::AlignRight:
+			qsi->child(align_grp_row, 1)->setData(tr("Right"), Qt::DisplayRole);
+			break;
+		case Qt::AlignVCenter:
+			qsi->child(align_grp_row, 1)
+				->setData(tr("Middle"), Qt::DisplayRole);
+			break;
+		default: qsi->child(0, 1)->setData("", Qt::DisplayRole); break;
 		}
-		case grpPos:
-		{
-			qsi->child(x_grp_row,1)->setData(group->pos().x(), Qt::EditRole);
-			qsi->child(y_grp_row,1)->setData(group->pos().y(), Qt::EditRole);
-			break;
-		}
-		case grpRotation:
-			qsi->child(rot_grp_row,1)->setData(group->rotation(), Qt::EditRole);
-			break;
-		case grpVAdjust:
-			qsi->child(adjust_grp_row,1)->setData(group->verticalAdjustment(), Qt::EditRole);
-			break;
-		case grpName:
-			qsi->setData(group->name(), Qt::DisplayRole);
-			break;
-		case grpHoldBottom:
-		{
-			qsi->child(hold_to_bottom_grp_row,1)->setCheckState(group->holdToBottomPage()? Qt::Checked : Qt::Unchecked);
-			enableGroupRotationAndPos(group);
-			break;
-		}
-		case grpFrame:
-			qsi->child(frame_grp_row, 1)->setCheckState(group->frame()? Qt::Checked : Qt::Unchecked);
-			break;
-		default:break;
+		break;
 	}
-	
+	case grpPos:
+	{
+		qsi->child(x_grp_row, 1)->setData(group->pos().x(), Qt::EditRole);
+		qsi->child(y_grp_row, 1)->setData(group->pos().y(), Qt::EditRole);
+		break;
+	}
+	case grpRotation:
+		qsi->child(rot_grp_row, 1)->setData(group->rotation(), Qt::EditRole);
+		break;
+	case grpVAdjust:
+		qsi->child(adjust_grp_row, 1)
+			->setData(group->verticalAdjustment(), Qt::EditRole);
+		break;
+	case grpName: qsi->setData(group->name(), Qt::DisplayRole); break;
+	case grpHoldBottom:
+	{
+		qsi->child(hold_to_bottom_grp_row, 1)
+			->setCheckState(
+				group->holdToBottomPage() ? Qt::Checked : Qt::Unchecked);
+		enableGroupRotationAndPos(group);
+		break;
+	}
+	case grpFrame:
+		qsi->child(frame_grp_row, 1)
+			->setCheckState(group->frame() ? Qt::Checked : Qt::Unchecked);
+		break;
+	default: break;
+	}
+
 	m_block_dataChanged = false;
 }
-
 
 /***************************************************
 	A little delegate only for add a combobox and a color dialog,
 	for use with the model
  ***************************************************/
 
-DynamicTextItemDelegate::DynamicTextItemDelegate(QObject *parent) :
+DynamicTextItemDelegate::DynamicTextItemDelegate(QObject* parent) :
 	QStyledItemDelegate(parent)
-{}
-
-void DynamicTextItemDelegate::commitAndCloseDeferred(QWidget *editor) const
 {
-	auto *self = const_cast<DynamicTextItemDelegate *>(this);
-	QTimer::singleShot(0, self, [self, editor]() {
-		emit self->commitData(editor);
-		emit self->closeEditor(editor);
-	});
 }
 
-QWidget *DynamicTextItemDelegate::createEditor(
-		QWidget *parent,
-		const QStyleOptionViewItem &option,
-		const QModelIndex &index) const
+void DynamicTextItemDelegate::commitAndCloseDeferred(QWidget* editor) const
 {
-	switch (index.data(Qt::UserRole+1).toInt())
-	{
-		case DynamicElementTextModel::textFrom:
+	auto* self = const_cast<DynamicTextItemDelegate*>(this);
+	QTimer::singleShot(
+		0,
+		self,
+		[self, editor]()
 		{
-			QComboBox *qcb = new QComboBox(parent);
-			qcb->setObjectName("text_from");
-			qcb->addItem(tr("User text"));
-			qcb->addItem(tr("Element information"));
-			qcb->addItem(tr("Composite text"));
-			return qcb;
-		}
-		case DynamicElementTextModel::infoText:
-		{
-			const DynamicElementTextModel *detm = static_cast<const DynamicElementTextModel *>(index.model());
-			QStandardItem *qsi = detm->itemFromIndex(index);
-			
-			if(!qsi)
-				break;
-			
-			DynamicElementTextItem *deti = detm->textFromIndex(index);
-			if(!deti)
-				break;
-				
-			QComboBox *qcb = new QComboBox(parent);
-			qcb->setObjectName("info_text");
+			emit self->commitData(editor);
+			emit self->closeEditor(editor);
+		});
+}
 
-			QStringList strl = availableInfo(deti);
-			for (int i=0; i<strl.size();++i) {
-				qcb -> addItem(infoDisplayName(strl[i]), strl[i]);
-			}
-			return qcb;
-		}
-		case DynamicElementTextModel::compositeText:
+QWidget* DynamicTextItemDelegate::createEditor(
+	QWidget*					parent,
+	const QStyleOptionViewItem& option,
+	const QModelIndex&			index) const
+{
+	switch (index.data(Qt::UserRole + 1).toInt())
+	{
+	case DynamicElementTextModel::textFrom:
+	{
+		QComboBox* qcb = new QComboBox(parent);
+		qcb->setObjectName("text_from");
+		qcb->addItem(tr("User text"));
+		qcb->addItem(tr("Element information"));
+		qcb->addItem(tr("Composite text"));
+		return qcb;
+	}
+	case DynamicElementTextModel::infoText:
+	{
+		const DynamicElementTextModel* detm =
+			static_cast<const DynamicElementTextModel*>(index.model());
+		QStandardItem* qsi = detm->itemFromIndex(index);
+
+		if (! qsi) break;
+
+		DynamicElementTextItem* deti = detm->textFromIndex(index);
+		if (! deti) break;
+
+		QComboBox* qcb = new QComboBox(parent);
+		qcb->setObjectName("info_text");
+
+		QStringList strl = availableInfo(deti);
+		for (int i = 0; i < strl.size(); ++i)
 		{
-			const DynamicElementTextModel *detm = static_cast<const DynamicElementTextModel *>(index.model());
-			QStandardItem *qsi = detm->itemFromIndex(index);
-			
-			if(!qsi)
-				break;
-			
-			DynamicElementTextItem *deti = detm->textFromIndex(index);
-			if(!deti)
-				break;
-			
-			CompositeTextEditDialog *cted = new CompositeTextEditDialog(deti, parent);
-			cted->setObjectName("composite_text");
-			return cted;
+			qcb->addItem(infoDisplayName(strl[i]), strl[i]);
 		}
-		case DynamicElementTextModel::txtAlignment:
+		return qcb;
+	}
+	case DynamicElementTextModel::compositeText:
+	{
+		const DynamicElementTextModel* detm =
+			static_cast<const DynamicElementTextModel*>(index.model());
+		QStandardItem* qsi = detm->itemFromIndex(index);
+
+		if (! qsi) break;
+
+		DynamicElementTextItem* deti = detm->textFromIndex(index);
+		if (! deti) break;
+
+		CompositeTextEditDialog* cted =
+			new CompositeTextEditDialog(deti, parent);
+		cted->setObjectName("composite_text");
+		return cted;
+	}
+	case DynamicElementTextModel::txtAlignment:
+	{
+		const DynamicElementTextModel* detm =
+			static_cast<const DynamicElementTextModel*>(index.model());
+		QStandardItem* qsi = detm->itemFromIndex(index);
+
+		if (! qsi) break;
+
+		DynamicElementTextItem* deti = detm->textFromIndex(index);
+		if (! deti) break;
+
+		AlignmentTextDialog* atd =
+			new AlignmentTextDialog(deti->alignment(), parent);
+		atd->setObjectName("alignment_text");
+		return atd;
+	}
+	case DynamicElementTextModel::layer:
+	{
+		const DynamicElementTextModel* detm =
+			static_cast<const DynamicElementTextModel*>(index.model());
+		DynamicElementTextItem* deti =
+			detm ? detm->textFromIndex(index) : nullptr;
+		QComboBox* qcb = new QComboBox(parent);
+		qcb->setObjectName("layer_combo");
+		qcb->addItem(tr("<None>"), QString());
+		if (deti && deti->diagram() && deti->diagram()->project())
 		{
-			const DynamicElementTextModel *detm = static_cast<const DynamicElementTextModel *>(index.model());
-			QStandardItem *qsi = detm->itemFromIndex(index);
-			
-			if(!qsi)
-				break;
-			
-			DynamicElementTextItem *deti = detm->textFromIndex(index);
-			if(!deti)
-				break;
-			
-			AlignmentTextDialog *atd = new AlignmentTextDialog(deti->alignment(), parent);
-			atd->setObjectName("alignment_text");
-			return atd;
-		}
-		case DynamicElementTextModel::size:
-		{
-			QSpinBox *sb = new QSpinBox(parent);
-			sb->setObjectName("font_size");
-			sb->setFrame(false);
-			return sb;
-		}
-		case DynamicElementTextModel::font:
-		{
-			bool ok;
-			QFont font = QFontDialog::getFont(&ok, index.data(Qt::UserRole+2).value<QFont>(), parent,
-											  QString(), QFontDialog::DontUseNativeDialog);
-			QWidget *w = new QWidget(parent);
-			if (ok)
+			const auto& dlayers = deti->diagram()->project()->drawingLayers();
+			for (const QString& name : dlayers.names())
 			{
-				w->setFont(font);
-				w->setProperty("ok", ok);
+				const QString desc = dlayers.description(name);
+				const QString label =
+					desc.isEmpty() ? name :
+									 QStringLiteral("%1 - %2").arg(name, desc);
+				qcb->addItem(label, name);
 			}
-			w->setObjectName("font_dialog");
-			commitAndCloseDeferred(w);
-			return w;
 		}
-		case DynamicElementTextModel::color:
+		const QString current_layer = index.data(Qt::UserRole + 2).toString();
+		const int	  idx			= qcb->findData(current_layer);
+		if (idx >= 0) qcb->setCurrentIndex(idx);
+		connect(
+			qcb,
+			&QComboBox::currentIndexChanged,
+			this,
+			[this, qcb]() { commitAndCloseDeferred(qcb); });
+		return qcb;
+	}
+	case DynamicElementTextModel::size:
+	{
+		QSpinBox* sb = new QSpinBox(parent);
+		sb->setObjectName("font_size");
+		sb->setFrame(false);
+		return sb;
+	}
+	case DynamicElementTextModel::font:
+	{
+		bool  ok;
+		QFont font = QFontDialog::getFont(
+			&ok,
+			index.data(Qt::UserRole + 2).value<QFont>(),
+			parent,
+			QString(),
+			QFontDialog::DontUseNativeDialog);
+		QWidget* w = new QWidget(parent);
+		if (ok)
 		{
-				/* Like the font case above: run the dialog synchronously via
-				 * its static convenience function and stash the result on a
-				 * plain placeholder widget, rather than handing back the
-				 * QColorDialog itself as the item view's "editor".
-				 *
-				 * The item view's own Enter/Escape handling (the base
-				 * QStyledItemDelegate::eventFilter(), since "color_dialog"
-				 * isn't one of the objectNames special-cased in this
-				 * delegate's own eventFilter() above) treats whatever
-				 * createEditor() returned as a small inline editor it
-				 * commits and destroys directly on a key press. A QColorDialog
-				 * is not that: on Windows it can hand off to the native
-				 * color picker, whose own accept/close path then races the
-				 * view's -- pressing Enter fired both, one tearing down an
-				 * object the other was still using (case #323 on the bug
-				 * tracker: "QObject::installEventFilter(): Cannot filter
-				 * events for objects in a different thread" immediately
-				 * followed by a segfault; clicking the dialog's own OK
-				 * button with the mouse didn't reach the view's key
-				 * handling, so it didn't crash). Resolving the dialog
-				 * before returning removes the second, competing teardown
-				 * path entirely. */
-			QColor color = QColorDialog::getColor(index.data(Qt::EditRole).value<QColor>(), parent,
-											 QString(), QColorDialog::DontUseNativeDialog);
-			QWidget *w = new QWidget(parent);
-			if (color.isValid())
-			{
-				w->setProperty("color", color);
-				w->setProperty("ok", true);
-			}
-			w->setObjectName("color_dialog");
-			commitAndCloseDeferred(w);
-			return w;
+			w->setFont(font);
+			w->setProperty("ok", ok);
 		}
-		case DynamicElementTextModel::pos:
+		w->setObjectName("font_dialog");
+		commitAndCloseDeferred(w);
+		return w;
+	}
+	case DynamicElementTextModel::color:
+	{
+		/* Like the font case above: run the dialog synchronously via
+		 * its static convenience function and stash the result on a
+		 * plain placeholder widget, rather than handing back the
+		 * QColorDialog itself as the item view's "editor".
+		 *
+		 * The item view's own Enter/Escape handling (the base
+		 * QStyledItemDelegate::eventFilter(), since "color_dialog"
+		 * isn't one of the objectNames special-cased in this
+		 * delegate's own eventFilter() above) treats whatever
+		 * createEditor() returned as a small inline editor it
+		 * commits and destroys directly on a key press. A QColorDialog
+		 * is not that: on Windows it can hand off to the native
+		 * color picker, whose own accept/close path then races the
+		 * view's -- pressing Enter fired both, one tearing down an
+		 * object the other was still using (case #323 on the bug
+		 * tracker: "QObject::installEventFilter(): Cannot filter
+		 * events for objects in a different thread" immediately
+		 * followed by a segfault; clicking the dialog's own OK
+		 * button with the mouse didn't reach the view's key
+		 * handling, so it didn't crash). Resolving the dialog
+		 * before returning removes the second, competing teardown
+		 * path entirely. */
+		QColor color = QColorDialog::getColor(
+			index.data(Qt::EditRole).value<QColor>(),
+			parent,
+			QString(),
+			QColorDialog::DontUseNativeDialog);
+		QWidget* w = new QWidget(parent);
+		if (color.isValid())
 		{
-			QSpinBox *sb = new QSpinBox(parent);
-			sb->setObjectName("pos_dialog");
-			sb->setRange(-1000,10000);
-			sb->setFrame(false);
-			sb->setSuffix(" px");
-			return sb;
+			w->setProperty("color", color);
+			w->setProperty("ok", true);
 		}
-		case DynamicElementTextModel::rotation:
-		{
-			QSpinBox *sb = new QSpinBox(parent);
-			sb->setObjectName("rot_spinbox");
-			sb->setRange(0, 359);
-			sb->setWrapping(true);
-			sb->setFrame(false);
-			sb->setSuffix(" °");
-			return sb;
-		}
-		case DynamicElementTextModel::textWidth:
-		case DynamicElementTextModel::textHeight:
-		{
-			QSpinBox *sb = new QSpinBox(parent);
-			sb->setObjectName(index.data(Qt::UserRole+1).toInt() == DynamicElementTextModel::textWidth
-							  ? "width_spinbox" : "height_spinbox");
-			sb->setRange(1, 1000);
-			sb->setFrame(false);
-			sb->setSuffix(" px");
-			return sb;
-		}
-		case DynamicElementTextModel::grpAlignment:
-		{
-			QComboBox *qcb = new QComboBox(parent);
-			qcb->setFrame(false);
-			qcb->setObjectName("group_alignment");
-			qcb->addItem(tr("Left"));
-			qcb->addItem(tr("Middle"));
-			qcb->addItem(tr("Right"));
-			return qcb;
-		}
-		case DynamicElementTextModel::grpPos:
-		{
-			QSpinBox *sb = new QSpinBox(parent);
-			sb->setObjectName("group_pos");
-			sb->setRange(-1000,10000);
-			sb->setFrame(false);
-			sb->setSuffix(" px");
-			return sb;
-		}
-		case DynamicElementTextModel::grpRotation:
-		{
-			QSpinBox *sb = new QSpinBox(parent);
-			sb->setObjectName("group_rotation");
-			sb->setRange(0, 359);
-			sb->setWrapping(true);
-			sb->setFrame(false);
-			sb->setSuffix(" °");
-			return sb;
-		}
-		case DynamicElementTextModel::grpVAdjust:
-		{
-			QSpinBox *sb = new QSpinBox(parent);
-			sb->setObjectName("group_v_adjustment");
-			sb->setRange(-20, 20);
-			sb->setFrame(false);
-			sb->setSuffix(" px");
-			return sb;
-		}
+		w->setObjectName("color_dialog");
+		commitAndCloseDeferred(w);
+		return w;
+	}
+	case DynamicElementTextModel::pos:
+	{
+		QSpinBox* sb = new QSpinBox(parent);
+		sb->setObjectName("pos_dialog");
+		sb->setRange(-1000, 10000);
+		sb->setFrame(false);
+		sb->setSuffix(" px");
+		return sb;
+	}
+	case DynamicElementTextModel::rotation:
+	{
+		QSpinBox* sb = new QSpinBox(parent);
+		sb->setObjectName("rot_spinbox");
+		sb->setRange(0, 359);
+		sb->setWrapping(true);
+		sb->setFrame(false);
+		sb->setSuffix(" °");
+		return sb;
+	}
+	case DynamicElementTextModel::textWidth:
+	case DynamicElementTextModel::textHeight:
+	{
+		QSpinBox* sb = new QSpinBox(parent);
+		sb->setObjectName(
+			index.data(Qt::UserRole + 1).toInt()
+					== DynamicElementTextModel::textWidth ?
+				"width_spinbox" :
+				"height_spinbox");
+		sb->setRange(1, 1000);
+		sb->setFrame(false);
+		sb->setSuffix(" px");
+		return sb;
+	}
+	case DynamicElementTextModel::grpAlignment:
+	{
+		QComboBox* qcb = new QComboBox(parent);
+		qcb->setFrame(false);
+		qcb->setObjectName("group_alignment");
+		qcb->addItem(tr("Left"));
+		qcb->addItem(tr("Middle"));
+		qcb->addItem(tr("Right"));
+		return qcb;
+	}
+	case DynamicElementTextModel::grpPos:
+	{
+		QSpinBox* sb = new QSpinBox(parent);
+		sb->setObjectName("group_pos");
+		sb->setRange(-1000, 10000);
+		sb->setFrame(false);
+		sb->setSuffix(" px");
+		return sb;
+	}
+	case DynamicElementTextModel::grpRotation:
+	{
+		QSpinBox* sb = new QSpinBox(parent);
+		sb->setObjectName("group_rotation");
+		sb->setRange(0, 359);
+		sb->setWrapping(true);
+		sb->setFrame(false);
+		sb->setSuffix(" °");
+		return sb;
+	}
+	case DynamicElementTextModel::grpVAdjust:
+	{
+		QSpinBox* sb = new QSpinBox(parent);
+		sb->setObjectName("group_v_adjustment");
+		sb->setRange(-20, 20);
+		sb->setFrame(false);
+		sb->setSuffix(" px");
+		return sb;
+	}
 	}
 	return QStyledItemDelegate::createEditor(parent, option, index);
 }
 
 void DynamicTextItemDelegate::setModelData(
-		QWidget *editor,
-		QAbstractItemModel *model,
-		const QModelIndex &index) const
+	QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
 	if (index.isValid())
 	{
 		if (editor->objectName() == "font_dialog")
 		{
-			if (QStandardItemModel *qsim = dynamic_cast<QStandardItemModel *>(model))
+			if (QStandardItemModel* qsim =
+					dynamic_cast<QStandardItemModel*>(model))
 			{
-				if(QStandardItem *qsi = qsim->itemFromIndex(index))
+				if (QStandardItem* qsi = qsim->itemFromIndex(index))
 				{
 					if (editor->property("ok").toBool() == true)
 					{
 						qsi->setData(editor->font().family(), Qt::EditRole);
-						qsi->setData(editor->font(), Qt::UserRole+2);
+						qsi->setData(editor->font(), Qt::UserRole + 2);
 					}
 					return;
 				}
 			}
 		}
-		else if(editor->objectName() == "color_dialog")
+		else if (editor->objectName() == "color_dialog")
 		{
-			if (QStandardItemModel *qsim = dynamic_cast<QStandardItemModel *>(model))
+			if (QStandardItemModel* qsim =
+					dynamic_cast<QStandardItemModel*>(model))
 			{
-				if(QStandardItem *qsi = qsim->itemFromIndex(index))
+				if (QStandardItem* qsi = qsim->itemFromIndex(index))
 				{
 					if (editor->property("ok").toBool() == true)
 					{
-						QColor color = editor->property("color").value<QColor>();
+						QColor color =
+							editor->property("color").value<QColor>();
 						qsi->setData(color, Qt::EditRole);
 						qsi->setData(color, Qt::DecorationRole);
 					}
 					return;
 				}
-
 			}
 		}
 		else if (editor->objectName() == "info_text")
 		{
-			if (QStandardItemModel *qsim = dynamic_cast<QStandardItemModel *>(model))
+			if (QStandardItemModel* qsim =
+					dynamic_cast<QStandardItemModel*>(model))
 			{
-				if(QStandardItem *qsi = qsim->itemFromIndex(index))
+				if (QStandardItem* qsi = qsim->itemFromIndex(index))
 				{
-					QComboBox *cb = static_cast<QComboBox *>(editor);
+					QComboBox* cb = static_cast<QComboBox*>(editor);
 					qsi->setData(cb->currentText(), Qt::DisplayRole);
-					qsi->setData(cb->currentData(), Qt::UserRole+2);
+					qsi->setData(cb->currentData(), Qt::UserRole + 2);
 					return;
 				}
-				
+			}
+		}
+		else if (editor->objectName() == "layer_combo")
+		{
+			if (QStandardItemModel* qsim =
+					dynamic_cast<QStandardItemModel*>(model))
+			{
+				if (QStandardItem* qsi = qsim->itemFromIndex(index))
+				{
+					QComboBox*	  cb		 = static_cast<QComboBox*>(editor);
+					const QString layer_name = cb->currentData().toString();
+					qsi->setData(
+						layer_name.isEmpty() ? tr("<None>") : layer_name,
+						Qt::DisplayRole);
+					qsi->setData(layer_name, Qt::UserRole + 2);
+					return;
+				}
 			}
 		}
 		else if (editor->objectName() == "composite_text")
 		{
-			if (QStandardItemModel *qsim = dynamic_cast<QStandardItemModel *>(model))
+			if (QStandardItemModel* qsim =
+					dynamic_cast<QStandardItemModel*>(model))
 			{
-				if(QStandardItem *qsi = qsim->itemFromIndex(index))
+				if (QStandardItem* qsi = qsim->itemFromIndex(index))
 				{
-					
-					CompositeTextEditDialog *cted = static_cast<CompositeTextEditDialog *>(editor);
-					
+
+					CompositeTextEditDialog* cted =
+						static_cast<CompositeTextEditDialog*>(editor);
+
 					QString edited_text = cted->plainText();
 					QString assigned_text;
-					
-					const DynamicElementTextModel *detm = static_cast<const DynamicElementTextModel *>(index.model());
-					DynamicElementTextItem *deti = detm->textFromIndex(index);
-					if(deti)
+
+					const DynamicElementTextModel* detm =
+						static_cast<const DynamicElementTextModel*>(
+							index.model());
+					DynamicElementTextItem* deti = detm->textFromIndex(index);
+					if (deti)
 					{
 						DiagramContext dc;
-						if(deti->elementUseForInfo())
-							dc = deti->elementUseForInfo()->elementInformations();
-						assigned_text = autonum::AssignVariables::replaceVariable(edited_text, dc, deti->elementUseForInfo());
+						if (deti->elementUseForInfo())
+							dc = deti->elementUseForInfo()
+									 ->elementInformations();
+						assigned_text =
+							autonum::AssignVariables::replaceVariable(
+								edited_text,
+								dc,
+								deti->elementUseForInfo());
 					}
-					
+
 					qsi->setData(assigned_text, Qt::DisplayRole);
-					qsi->setData(edited_text, Qt::UserRole+2);
+					qsi->setData(edited_text, Qt::UserRole + 2);
 					return;
 				}
 			}
 		}
 		else if (editor->objectName() == "alignment_text")
-		{	
-			if(QStandardItemModel *qsim = dynamic_cast<QStandardItemModel *>(model))
+		{
+			if (QStandardItemModel* qsim =
+					dynamic_cast<QStandardItemModel*>(model))
 			{
-				if(QStandardItem *qsi = qsim->itemFromIndex(index))
+				if (QStandardItem* qsi = qsim->itemFromIndex(index))
 				{
-					AlignmentTextDialog *atd = static_cast<AlignmentTextDialog *>(editor);
+					AlignmentTextDialog* atd =
+						static_cast<AlignmentTextDialog*>(editor);
 					Qt::Alignment align = atd->alignment();
-					qsi->setData(QVariant::fromValue(align), Qt::UserRole+2);
+					qsi->setData(QVariant::fromValue(align), Qt::UserRole + 2);
 					return;
 				}
 			}
 		}
 		else if (editor->objectName() == "group_alignment")
 		{
-			if(QStandardItemModel *qsim = dynamic_cast<QStandardItemModel *>(model))
+			if (QStandardItemModel* qsim =
+					dynamic_cast<QStandardItemModel*>(model))
 			{
-				if(QStandardItem *qsi = qsim->itemFromIndex(index))
+				if (QStandardItem* qsi = qsim->itemFromIndex(index))
 				{
-					QComboBox *cb = static_cast<QComboBox *>(editor);
+					QComboBox* cb = static_cast<QComboBox*>(editor);
 					qsi->setData(cb->currentText(), Qt::DisplayRole);
 				}
 			}
 		}
 	}
-	
+
 	QStyledItemDelegate::setModelData(editor, model, index);
 }
 
-bool DynamicTextItemDelegate::eventFilter(QObject *object, QEvent *event)
+bool DynamicTextItemDelegate::eventFilter(QObject* object, QEvent* event)
 {
-	
-	//This is a bad hack, for change the normal behavior :
-	//in normal behavior,
-	//the value is committed when the spinbox lose focus or enter key is pressed
-	//With this hack the value is committed each time the value change without the need to validate.
-	//then the change is apply in live
-	if(object->objectName() == "pos_dialog" || object->objectName() == "font_size" || object->objectName() == "rot_spinbox" || \
-	   object->objectName() == "group_rotation" || object->objectName() == "group_v_adjustment" || object->objectName() == "width_spinbox" ||\
-	   object->objectName() == "group_pos")
+
+	// This is a bad hack, for change the normal behavior :
+	// in normal behavior,
+	// the value is committed when the spinbox lose focus or enter key is
+	// pressed With this hack the value is committed each time the value change
+	// without the need to validate. then the change is apply in live
+	if (object->objectName() == "pos_dialog"
+		|| object->objectName() == "font_size"
+		|| object->objectName() == "rot_spinbox"
+		|| object->objectName() == "group_rotation"
+		|| object->objectName() == "group_v_adjustment"
+		|| object->objectName() == "width_spinbox"
+		|| object->objectName() == "group_pos")
 	{
 		object->event(event);
-		
-		QSpinBox *sb = static_cast<QSpinBox *>(object);
-		switch (event->type()) {
-			case QEvent::KeyPress:
-				emit commitData(sb); break;
-			case QEvent::KeyRelease:
-				emit commitData(sb); break;
-			case QEvent::MouseButtonPress:
-				emit commitData(sb); break;
-			case QEvent::MouseButtonRelease:
-				emit commitData(sb); break;
-			case QEvent::Wheel:
-				emit commitData(sb); break;
-			default:break;
+
+		QSpinBox* sb = static_cast<QSpinBox*>(object);
+		switch (event->type())
+		{
+		case QEvent::KeyPress: emit commitData(sb); break;
+		case QEvent::KeyRelease: emit commitData(sb); break;
+		case QEvent::MouseButtonPress: emit commitData(sb); break;
+		case QEvent::MouseButtonRelease: emit commitData(sb); break;
+		case QEvent::Wheel: emit commitData(sb); break;
+		default: break;
 		}
 		return true;
 	}
-	
-	//Like the hack above, change the current index of the combobox,
-	// apply the change immediately, no need to lose focus or press enter.
-	if((object->objectName() == "text_from" || object->objectName() == "info_text" || object->objectName() == "group_alignment") && event->type() == QEvent::FocusIn)
+
+	// Like the hack above, change the current index of the combobox,
+	//  apply the change immediately, no need to lose focus or press enter.
+	if ((object->objectName() == "text_from"
+		 || object->objectName() == "info_text"
+		 || object->objectName() == "group_alignment")
+		&& event->type() == QEvent::FocusIn)
 	{
-		QComboBox *qcb = static_cast<QComboBox *>(object);
-		connect(qcb, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), [this,qcb](){emit commitData(qcb);});
+		QComboBox* qcb = static_cast<QComboBox*>(object);
+		connect(
+			qcb,
+			static_cast<void (QComboBox::*)(int)>(
+				&QComboBox::currentIndexChanged),
+			[this, qcb]() { emit commitData(qcb); });
 	}
-	
+
 	return QStyledItemDelegate::eventFilter(object, event);
 }
 
@@ -2068,36 +2480,36 @@ bool DynamicTextItemDelegate::eventFilter(QObject *object, QEvent *event)
 	@param deti
 	@return A list of available info of element
 */
-QStringList DynamicTextItemDelegate::availableInfo(
-		DynamicElementTextItem *deti) const
+QStringList
+DynamicTextItemDelegate::availableInfo(DynamicElementTextItem* deti) const
 {
 	QStringList qstrl;
-	
-	if(deti->parentElement()->linkType() & Element::AllReport) //Special treatment for text owned by a folio report
+
+	if (deti->parentElement()->linkType()
+		& Element::AllReport) // Special treatment for text owned by a folio
+							  // report
 	{
 		return QETInformation::folioReportInfoKeys();
 	}
 	else
 	{
-		Element *elmt = deti->elementUseForInfo();
-		if(!elmt)
-			return qstrl;
-		
-		
+		Element* elmt = deti->elementUseForInfo();
+		if (! elmt) return qstrl;
+
 		QStringList info_list = QETInformation::elementInfoKeys();
-		info_list.removeAll("formula"); //No need to have formula
+		info_list.removeAll("formula"); // No need to have formula
 		DiagramContext dc = elmt->elementInformations();
-		
-		for(const QString& info : info_list)
+
+		for (const QString& info : info_list)
 		{
-			if(dc.contains(info))
-				qstrl << info;
+			if (dc.contains(info)) qstrl << info;
 		}
 		qstrl << QETInformation::elementCustomInfoKeys(dc.keys());
 
-			//Read from the wires, never stored (#1585)
+		// Read from the wires, never stored (#1585)
 		if (elmt->elementData().m_type == ElementData::Terminal)
-			qstrl << QETInformation::terminalConductorInfoKeys(elmt->terminals().size());
+			qstrl << QETInformation::terminalConductorInfoKeys(
+				elmt->terminals().size());
 	}
 	return qstrl;
 }

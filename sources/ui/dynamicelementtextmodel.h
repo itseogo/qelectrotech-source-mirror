@@ -18,10 +18,9 @@
 #ifndef DYNAMICELEMENTTEXTMODEL_H
 #define DYNAMICELEMENTTEXTMODEL_H
 
-#include <qetgraphicsitem/dynamicelementtextitem.h>
-
 #include <QHash>
 #include <QStandardItemModel>
+#include <qetgraphicsitem/dynamicelementtextitem.h>
 #include <qstyleditemdelegate.h>
 
 class QUndoCommand;
@@ -38,9 +37,10 @@ class DynamicElementTextModel : public QStandardItemModel
 {
 	Q_OBJECT
 
-	public:
-	enum ValueType {
-		textFrom =1,
+  public:
+	enum ValueType
+	{
+		textFrom = 1,
 		userText,
 		infoText,
 		compositeText,
@@ -62,78 +62,76 @@ class DynamicElementTextModel : public QStandardItemModel
 		grpVAdjust,
 		grpName,
 		grpHoldBottom,
-		grpFrame
+		grpFrame,
+		layer
 	};
 
-	DynamicElementTextModel(Element *element, QObject *parent = nullptr);
+	DynamicElementTextModel(Element* element, QObject* parent = nullptr);
 	~DynamicElementTextModel() override;
 
-	bool indexIsInGroup(const QModelIndex &index) const;
-	DynamicElementTextItem *textFromIndex(const QModelIndex &index) const;
-	DynamicElementTextItem *textFromItem(QStandardItem *item) const;
-	QModelIndex indexFromText(DynamicElementTextItem *text) const;
-	QUndoCommand *undoForEditedText(
-			DynamicElementTextItem *deti,
-			QUndoCommand *parent_undo = nullptr) const;
-	QUndoCommand *undoForEditedGroup(
-			ElementTextItemGroup *group,
-			QUndoCommand *parent_undo = nullptr) const;
+	bool					indexIsInGroup(const QModelIndex& index) const;
+	DynamicElementTextItem* textFromIndex(const QModelIndex& index) const;
+	DynamicElementTextItem* textFromItem(QStandardItem* item) const;
+	QModelIndex				indexFromText(DynamicElementTextItem* text) const;
+	QUndoCommand*			undoForEditedText(
+				  DynamicElementTextItem* deti,
+				  QUndoCommand*			  parent_undo = nullptr) const;
+	QUndoCommand* undoForEditedGroup(
+		ElementTextItemGroup* group, QUndoCommand* parent_undo = nullptr) const;
 
-	ElementTextItemGroup *groupFromIndex(const QModelIndex &index) const;
-	ElementTextItemGroup *groupFromItem(QStandardItem *item) const;
-	QModelIndex indexFromGroup(ElementTextItemGroup *group) const;
-	bool indexIsText(const QModelIndex &index) const;
-	bool indexIsGroup(const QModelIndex &index) const;
+	ElementTextItemGroup* groupFromIndex(const QModelIndex& index) const;
+	ElementTextItemGroup* groupFromItem(QStandardItem* item) const;
+	QModelIndex			  indexFromGroup(ElementTextItemGroup* group) const;
+	bool				  indexIsText(const QModelIndex& index) const;
+	bool				  indexIsGroup(const QModelIndex& index) const;
 
 	bool canDropMimeData(
-			const QMimeData *data,
-			Qt::DropAction action,
-			int row,
-			int column,
-			const QModelIndex &parent) const override;
+		const QMimeData*   data,
+		Qt::DropAction	   action,
+		int				   row,
+		int				   column,
+		const QModelIndex& parent) const override;
 	bool dropMimeData(
-			const QMimeData *data,
-			Qt::DropAction action,
-			int row,
-			int column,
-			const QModelIndex &parent) override;
-	QMimeData *mimeData(const QModelIndexList &indexes) const override;
+		const QMimeData*   data,
+		Qt::DropAction	   action,
+		int				   row,
+		int				   column,
+		const QModelIndex& parent) override;
+	QMimeData*	mimeData(const QModelIndexList& indexes) const override;
 	QStringList mimeTypes() const override;
 
-	signals:
+  signals:
 	void dataChanged();
 
-	private:
-	QList<QStandardItem *> itemsForText(DynamicElementTextItem *deti);
-	void addText(DynamicElementTextItem *deti);
-	void removeText(DynamicElementTextItem *deti);
-	void addGroup(ElementTextItemGroup *group);
-	void removeGroup(ElementTextItemGroup *group);
-	void addTextToGroup(
-			DynamicElementTextItem *deti,
-			ElementTextItemGroup *group);
-	void removeTextFromGroup(DynamicElementTextItem *deti,
-				 ElementTextItemGroup *group);
+  private:
+	QList<QStandardItem*> itemsForText(DynamicElementTextItem* deti);
+	void				  addText(DynamicElementTextItem* deti);
+	void				  removeText(DynamicElementTextItem* deti);
+	void				  addGroup(ElementTextItemGroup* group);
+	void				  removeGroup(ElementTextItemGroup* group);
+	void
+	addTextToGroup(DynamicElementTextItem* deti, ElementTextItemGroup* group);
+	void removeTextFromGroup(
+		DynamicElementTextItem* deti, ElementTextItemGroup* group);
 	void enableSourceText(
-			DynamicElementTextItem *deti,
-			DynamicElementTextItem::TextFrom tf );
-	void enableGroupRotationAndPos(ElementTextItemGroup *group);
-	void itemDataChanged(QStandardItem *qsi);
-	void setConnection(DynamicElementTextItem *deti, bool set);
-	void setConnection(ElementTextItemGroup *group, bool set);
-	void updateDataFromText(DynamicElementTextItem *deti,
-				DynamicElementTextModel::ValueType type);
-	void updateDataFromGroup(ElementTextItemGroup *group,
-				 DynamicElementTextModel::ValueType type);
+		DynamicElementTextItem* deti, DynamicElementTextItem::TextFrom tf);
+	void enableGroupRotationAndPos(ElementTextItemGroup* group);
+	void itemDataChanged(QStandardItem* qsi);
+	void setConnection(DynamicElementTextItem* deti, bool set);
+	void setConnection(ElementTextItemGroup* group, bool set);
+	void updateDataFromText(
+		DynamicElementTextItem* deti, DynamicElementTextModel::ValueType type);
+	void updateDataFromGroup(
+		ElementTextItemGroup* group, DynamicElementTextModel::ValueType type);
 
-	private:
-	QPointer<Element> m_element;
-	QHash <DynamicElementTextItem *, QStandardItem *> m_texts_list;
-	QHash <ElementTextItemGroup *, QStandardItem *> m_groups_list;
-	QHash <DynamicElementTextItem *,
-	QList<QMetaObject::Connection>> m_hash_text_connect;
-	QHash <ElementTextItemGroup *,
-	QList<QMetaObject::Connection>> m_hash_group_connect;
+  private:
+	QPointer<Element>							   m_element;
+	QHash<DynamicElementTextItem*, QStandardItem*> m_texts_list;
+	QHash<ElementTextItemGroup*, QStandardItem*>   m_groups_list;
+	QHash<DynamicElementTextItem*, QList<QMetaObject::Connection>>
+		m_hash_text_connect;
+	QHash<ElementTextItemGroup*, QList<QMetaObject::Connection>>
+		 m_hash_group_connect;
 	bool m_block_dataChanged = false;
 };
 
@@ -141,38 +139,38 @@ class DynamicTextItemDelegate : public QStyledItemDelegate
 {
 	Q_OBJECT
 
-	public:
-	DynamicTextItemDelegate(QObject *parent = Q_NULLPTR);
+  public:
+	DynamicTextItemDelegate(QObject* parent = Q_NULLPTR);
 
-	QWidget *createEditor(
-			QWidget *parent,
-			const QStyleOptionViewItem &option,
-			const QModelIndex &index) const override;
+	QWidget* createEditor(
+		QWidget*					parent,
+		const QStyleOptionViewItem& option,
+		const QModelIndex&			index) const override;
 	void setModelData(
-			QWidget *editor,
-			QAbstractItemModel *model,
-			const QModelIndex &index) const override;
+		QWidget*			editor,
+		QAbstractItemModel* model,
+		const QModelIndex&	index) const override;
 
-	protected:
-	bool eventFilter(QObject *object, QEvent *event) override;
+  protected:
+	bool eventFilter(QObject* object, QEvent* event) override;
 
-	private:
-	QStringList availableInfo(DynamicElementTextItem *deti) const;
-		/**
-			@brief commitAndCloseDeferred
-			Schedule commitData()/closeEditor() for @a editor on the next
-			event loop iteration. For editors resolved synchronously inside
-			createEditor() (font/color, both run their picker dialog before
-			returning) there is no user interaction left to drive the base
-			QStyledItemDelegate::eventFilter()'s usual Enter/focus-out commit
-			path, so without this the value sits picked-but-uncommitted
-			until something unrelated (e.g. clicking elsewhere) happens to
-			trigger it. Deferred rather than called immediately: the view
-			only registers the widget createEditor() returns as "the active
-			editor" *after* createEditor() itself returns, so emitting here
-			would target an editor the view doesn't know about yet.
-		*/
-	void commitAndCloseDeferred(QWidget *editor) const;
+  private:
+	QStringList availableInfo(DynamicElementTextItem* deti) const;
+	/**
+		@brief commitAndCloseDeferred
+		Schedule commitData()/closeEditor() for @a editor on the next
+		event loop iteration. For editors resolved synchronously inside
+		createEditor() (font/color, both run their picker dialog before
+		returning) there is no user interaction left to drive the base
+		QStyledItemDelegate::eventFilter()'s usual Enter/focus-out commit
+		path, so without this the value sits picked-but-uncommitted
+		until something unrelated (e.g. clicking elsewhere) happens to
+		trigger it. Deferred rather than called immediately: the view
+		only registers the widget createEditor() returns as "the active
+		editor" *after* createEditor() itself returns, so emitting here
+		would target an editor the view doesn't know about yet.
+	*/
+	void commitAndCloseDeferred(QWidget* editor) const;
 };
 
 #endif // DYNAMICELEMENTTEXTMODEL_H

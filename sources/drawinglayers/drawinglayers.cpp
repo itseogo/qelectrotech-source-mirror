@@ -19,6 +19,7 @@
 
 #include "../diagram.h"
 #include "../qetgraphicsitem/diagramimageitem.h"
+#include "../qetgraphicsitem/dynamicelementtextitem.h"
 #include "../qetgraphicsitem/independenttextitem.h"
 #include "../qetgraphicsitem/qetshapeitem.h"
 #include "../qetgraphicsitem/structureboxitem.h"
@@ -482,7 +483,8 @@ namespace DrawingLayers
 		return qgraphicsitem_cast<const QetShapeItem*>(item)
 			   || qgraphicsitem_cast<const StructureBoxItem*>(item)
 			   || qgraphicsitem_cast<const IndependentTextItem*>(item)
-			   || qgraphicsitem_cast<const DiagramImageItem*>(item);
+			   || qgraphicsitem_cast<const DiagramImageItem*>(item)
+			   || qgraphicsitem_cast<const DynamicElementTextItem*>(item);
 	}
 
 	/**
@@ -536,10 +538,17 @@ namespace DrawingLayers
 
 		for (QGraphicsItem* item : folio->items())
 		{
+			const bool is_dyn_text =
+				qgraphicsitem_cast<const DynamicElementTextItem*>(item)
+				!= nullptr;
 			if (canBeOnLayer(item))
 			{
-				apply(item, set);
-				continue;
+				const QString item_layer = layerOf(item);
+				if (! item_layer.isEmpty() || ! is_dyn_text)
+				{
+					apply(item, set);
+					continue;
+				}
 			}
 			const QVariant val = item->data(ShownKinds::data_key);
 			if (! val.isValid()) continue;
@@ -854,5 +863,112 @@ namespace DrawingLayers
 
 		if (imported_count) *imported_count = count;
 		return count > 0;
+	}
+
+	QList<Layer> standardPresetLayers()
+	{
+		return {
+			{QStringLiteral("100"),
+			 QObject::tr("Graphics.General"),
+			 true,
+			 true,
+			 false},
+			{QStringLiteral("101"),
+			 QObject::tr("Graphics.Wide lines"),
+			 true,
+			 true,
+			 false},
+			{QStringLiteral("102"),
+			 QObject::tr("Graphics.Thin lines"),
+			 true,
+			 true,
+			 false},
+			{QStringLiteral("107"),
+			 QObject::tr("Graphics.Dimensions"),
+			 true,
+			 true,
+			 false},
+			{QStringLiteral("108"),
+			 QObject::tr("Graphics.Texts"),
+			 true,
+			 true,
+			 false},
+			{QStringLiteral("109"),
+			 QObject::tr("Graphics.Comments"),
+			 true,
+			 false,
+			 false},
+			{QStringLiteral("201"),
+			 QObject::tr("Graphics.Folio border"),
+			 true,
+			 true,
+			 false},
+			{QStringLiteral("307"),
+			 QObject::tr("Symbols.Structure boxes"),
+			 true,
+			 true,
+			 false},
+			{QStringLiteral("400"),
+			 QObject::tr("Element texts.Device tags (BMK)"),
+			 true,
+			 true,
+			 false},
+			{QStringLiteral("405"),
+			 QObject::tr("Conductor texts.Wire numbers"),
+			 true,
+			 true,
+			 false},
+			{QStringLiteral("420"),
+			 QObject::tr("Element texts.Cross-references"),
+			 true,
+			 true,
+			 false}};
+	}
+
+	QList<Group> standardPresetGroups()
+	{
+		QStringList without_bmk;
+		without_bmk << fixedKindName(FixedKind::FrameAndTitleBlock);
+		without_bmk << fixedKindName(FixedKind::WireNumbers);
+		without_bmk << fixedKindName(FixedKind::CrossReferences);
+		without_bmk << QStringLiteral("100") << QStringLiteral("101")
+					<< QStringLiteral("102") << QStringLiteral("107")
+					<< QStringLiteral("108") << QStringLiteral("109")
+					<< QStringLiteral("201") << QStringLiteral("307")
+					<< QStringLiteral("405") << QStringLiteral("420");
+		return {{QObject::tr("Without device tags"), without_bmk}};
+	}
+
+	void loadStandardPresets(Set& set)
+	{
+		for (const Layer& preset : standardPresetLayers())
+		{
+			bool found = false;
+			for (Layer& existing : set.layers)
+			{
+				if (existing.name == preset.name)
+				{
+					if (existing.description.isEmpty())
+						existing.description = preset.description;
+					found = true;
+					break;
+				}
+			}
+			if (! found) { set.layers.append(preset); }
+		}
+
+		for (const Group& preset_group : standardPresetGroups())
+		{
+			bool found = false;
+			for (Group& existing_group : set.groups)
+			{
+				if (existing_group.name == preset_group.name)
+				{
+					found = true;
+					break;
+				}
+			}
+			if (! found) { set.groups.append(preset_group); }
+		}
 	}
 } // namespace DrawingLayers

@@ -1,4 +1,4 @@
-﻿/*
+/*
 	Copyright 2006-2026 The QElectroTech Team
 	This file is part of QElectroTech.
 
@@ -17,15 +17,19 @@
 */
 #include "inditextpropertieswidget.h"
 
+#include "../drawinglayers/drawinglayers.h"
+#include "../qetproject.h"
+
+#include <QComboBox>
+#include <QLabel>
+#include <QLineEdit>
 #include <QPropertyUndoCommand/qpropertyundocommand.h>
+#include <QtGlobal>
 #include <diagram.h>
 #include <diagramcommands.h>
 #include <lastusedstyle.h>
 #include <qetgraphicsitem/independenttextitem.h>
 #include <ui_inditextpropertieswidget.h>
-
-#include <QLineEdit>
-#include <QtGlobal>
 
 /**
 	@return width as shown in the width spin box: whole pixels, 0 for the
@@ -33,24 +37,25 @@
 	and the first step up is 1 px; IndependentTextItem::setTextWidth()
 	treats 0 as -1, the automatic width, so the two never disagree.
 */
-static int spinBoxWidth(qreal width)
-{
-	return width > 0 ? qRound(width) : 0;
-}
+static int spinBoxWidth(qreal width) { return width > 0 ? qRound(width) : 0; }
 
 /**
 	@brief IndiTextPropertiesWidget::IndiTextPropertiesWidget
 	@param text : the text to edit
 	@param parent : the parent widget of this widget
 */
-IndiTextPropertiesWidget::IndiTextPropertiesWidget(IndependentTextItem *text, QWidget *parent) :
-	PropertiesEditorWidget(parent),
-	ui(new Ui::IndiTextPropertiesWidget)
+IndiTextPropertiesWidget::IndiTextPropertiesWidget(
+	IndependentTextItem* text, QWidget* parent) :
+	PropertiesEditorWidget(parent), ui(new Ui::IndiTextPropertiesWidget)
 {
 	ui->setupUi(this);
-	if (text) {
-		setText(text);
-	}
+	auto* layer_label = new QLabel(tr("Layer:"), this);
+	layer_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+	m_layer_cb = new QComboBox(this);
+	m_layer_cb->setObjectName(QStringLiteral("m_layer_cb"));
+	ui->gridLayout->addWidget(layer_label, 7, 0);
+	ui->gridLayout->addWidget(m_layer_cb, 7, 1, 1, 3);
+	if (text) { setText(text); }
 }
 
 /**
@@ -59,67 +64,88 @@ IndiTextPropertiesWidget::IndiTextPropertiesWidget(IndependentTextItem *text, QW
 	@param parent : the parent widget of this widget
 */
 IndiTextPropertiesWidget::IndiTextPropertiesWidget(
-		QList<IndependentTextItem *> text_list,
-		QWidget *parent) :
-	PropertiesEditorWidget (parent),
-	ui(new Ui::IndiTextPropertiesWidget)
+	QList<IndependentTextItem*> text_list, QWidget* parent) :
+	PropertiesEditorWidget(parent), ui(new Ui::IndiTextPropertiesWidget)
 {
 	ui->setupUi(this);
+	auto* layer_label = new QLabel(tr("Layer:"), this);
+	layer_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+	m_layer_cb = new QComboBox(this);
+	m_layer_cb->setObjectName(QStringLiteral("m_layer_cb"));
+	ui->gridLayout->addWidget(layer_label, 7, 0);
+	ui->gridLayout->addWidget(m_layer_cb, 7, 1, 1, 3);
 	setText(text_list);
 }
 
 /**
 	@brief IndiTextPropertiesWidget::~IndiTextPropertiesWidget
 */
-IndiTextPropertiesWidget::~IndiTextPropertiesWidget()
-{
-	delete  ui;
-}
+IndiTextPropertiesWidget::~IndiTextPropertiesWidget() { delete ui; }
 
 /**
 	@brief IndiTextPropertiesWidget::setText
 	@param text : set text as edited text
 */
-void IndiTextPropertiesWidget::setText(IndependentTextItem *text)
+void IndiTextPropertiesWidget::setText(IndependentTextItem* text)
 {
-	if (m_text) {
-		for (QMetaObject::Connection c : m_connect_list) {
-			disconnect(c);
-		}
+	if (m_text)
+	{
+		for (QMetaObject::Connection c : m_connect_list) { disconnect(c); }
 	}
-	
+
 	m_text = text;
 	m_connect_list.clear();
-	m_connect_list << connect(m_text.data(), &IndependentTextItem::xChanged, this, &IndiTextPropertiesWidget::updateUi);
-	m_connect_list << connect(m_text.data(), &IndependentTextItem::yChanged, this, &IndiTextPropertiesWidget::updateUi);
-	m_connect_list << connect(m_text.data(), &IndependentTextItem::rotationChanged, this, &IndiTextPropertiesWidget::updateUi);
-	m_connect_list << connect(m_text.data(), &IndependentTextItem::fontChanged, this, &IndiTextPropertiesWidget::updateUi);
-	m_connect_list << connect(m_text.data(), &IndependentTextItem::textEdited, this, &IndiTextPropertiesWidget::updateUi);
-	m_connect_list << connect(m_text.data(), &IndependentTextItem::textWidthChanged, this, &IndiTextPropertiesWidget::updateUi);
+	m_connect_list << connect(
+		m_text.data(),
+		&IndependentTextItem::xChanged,
+		this,
+		&IndiTextPropertiesWidget::updateUi);
+	m_connect_list << connect(
+		m_text.data(),
+		&IndependentTextItem::yChanged,
+		this,
+		&IndiTextPropertiesWidget::updateUi);
+	m_connect_list << connect(
+		m_text.data(),
+		&IndependentTextItem::rotationChanged,
+		this,
+		&IndiTextPropertiesWidget::updateUi);
+	m_connect_list << connect(
+		m_text.data(),
+		&IndependentTextItem::fontChanged,
+		this,
+		&IndiTextPropertiesWidget::updateUi);
+	m_connect_list << connect(
+		m_text.data(),
+		&IndependentTextItem::textEdited,
+		this,
+		&IndiTextPropertiesWidget::updateUi);
+	m_connect_list << connect(
+		m_text.data(),
+		&IndependentTextItem::textWidthChanged,
+		this,
+		&IndiTextPropertiesWidget::updateUi);
 
 	updateUi();
 }
 
-void IndiTextPropertiesWidget::setText(QList<IndependentTextItem *> text_list)
+void IndiTextPropertiesWidget::setText(QList<IndependentTextItem*> text_list)
 {
-	for (QMetaObject::Connection c : m_connect_list) {
-		disconnect(c);
-	}
+	for (QMetaObject::Connection c : m_connect_list) { disconnect(c); }
 	m_connect_list.clear();
 	m_text_list.clear();
 	m_text = nullptr;
-	
-	if (text_list.size() == 0) {
-		updateUi();
-	}
-	else if (text_list.size() == 1) 
+
+	if (text_list.size() == 0) { updateUi(); }
+	else if (text_list.size() == 1)
 	{
 		setText(text_list.first());
 		m_text_list.clear();
 	}
 	else
 	{
-		for (IndependentTextItem *iti : text_list) {
+		for (IndependentTextItem* iti : text_list)
+		{
 			m_text_list.append(QPointer<IndependentTextItem>(iti));
 		}
 		updateUi();
@@ -133,47 +159,42 @@ void IndiTextPropertiesWidget::setText(QList<IndependentTextItem *> text_list)
 */
 void IndiTextPropertiesWidget::apply()
 {
-	Diagram *d = nullptr;
-	
-	if (m_text && m_text->diagram()) {
-		d = m_text->diagram();
-	} else if (!m_text_list.isEmpty()) {
-		for (QPointer<IndependentTextItem> piti : m_text_list) {
-			if (piti->diagram()) {
+	Diagram* d = nullptr;
+
+	if (m_text && m_text->diagram()) { d = m_text->diagram(); }
+	else if (! m_text_list.isEmpty())
+	{
+		for (QPointer<IndependentTextItem> piti : m_text_list)
+		{
+			if (piti->diagram())
+			{
 				d = piti->diagram();
 				break;
 			}
 		}
 	}
-	
+
 	if (d)
 	{
-		QUndoCommand *undo = associatedUndo();
-		if (undo) {
-			d->undoStack().push(undo);
-		}
+		QUndoCommand* undo = associatedUndo();
+		if (undo) { d->undoStack().push(undo); }
 	}
 }
 
 /**
 	@brief IndiTextPropertiesWidget::setLiveEdit
 	@param live_edit
-	@return 
+	@return
 */
 bool IndiTextPropertiesWidget::setLiveEdit(bool live_edit)
 {
-	if (m_live_edit == live_edit) {
-		return true;
-	}
+	if (m_live_edit == live_edit) { return true; }
 	m_live_edit = live_edit;
-	
-	if (m_live_edit) {
-		setUpEditConnection();
-	}
-	else {
-		for (QMetaObject::Connection c : m_edit_connection) {
-			disconnect(c);
-		}
+
+	if (m_live_edit) { setUpEditConnection(); }
+	else
+	{
+		for (QMetaObject::Connection c : m_edit_connection) { disconnect(c); }
 		m_edit_connection.clear();
 	}
 	return true;
@@ -181,206 +202,388 @@ bool IndiTextPropertiesWidget::setLiveEdit(bool live_edit)
 
 /**
 	@brief IndiTextPropertiesWidget::associatedUndo
-	@return 
+	@return
 */
-QUndoCommand *IndiTextPropertiesWidget::associatedUndo() const
+QUndoCommand* IndiTextPropertiesWidget::associatedUndo() const
 {
 	if (m_live_edit)
 	{
-		QPropertyUndoCommand *undo = nullptr;
-			//One text is edited
+		QPropertyUndoCommand* undo = nullptr;
+		// One text is edited
 		if (m_text_list.isEmpty())
 		{
-			if(ui->m_x_sb->value() != m_text->pos().x()) {
-				undo = new QPropertyUndoCommand(m_text.data(), "x", QVariant(m_text->pos().x()), QVariant(ui->m_x_sb->value()));
+			if (ui->m_x_sb->value() != m_text->pos().x())
+			{
+				undo = new QPropertyUndoCommand(
+					m_text.data(),
+					"x",
+					QVariant(m_text->pos().x()),
+					QVariant(ui->m_x_sb->value()));
 				undo->setAnimated(true, false);
 				undo->setText(tr("Move a text field"));
 			}
-			if(ui->m_y_sb->value() != m_text->pos().y()) {
-				undo = new QPropertyUndoCommand(m_text.data(), "y", QVariant(m_text->pos().y()), QVariant(ui->m_y_sb->value()));
+			if (ui->m_y_sb->value() != m_text->pos().y())
+			{
+				undo = new QPropertyUndoCommand(
+					m_text.data(),
+					"y",
+					QVariant(m_text->pos().y()),
+					QVariant(ui->m_y_sb->value()));
 				undo->setAnimated(true, false);
 				undo->setText(tr("Move a text field"));
 			}
-			if(ui->m_angle_sb->value() != m_text->rotation()) {
-				undo = new QPropertyUndoCommand(m_text.data(), "rotation", QVariant(m_text->rotation()), QVariant(ui->m_angle_sb->value()));
+			if (ui->m_angle_sb->value() != m_text->rotation())
+			{
+				undo = new QPropertyUndoCommand(
+					m_text.data(),
+					"rotation",
+					QVariant(m_text->rotation()),
+					QVariant(ui->m_angle_sb->value()));
 				undo->setAnimated(true, false);
 				undo->setText(tr("Rotate a text field"));
 			}
-			if (ui->m_line_edit->text() != m_text->toPlainText()) {
-				undo = new QPropertyUndoCommand(m_text.data(), "plainText", m_text->toPlainText(), ui->m_line_edit->text());
+			if (ui->m_line_edit->text() != m_text->toPlainText())
+			{
+				undo = new QPropertyUndoCommand(
+					m_text.data(),
+					"plainText",
+					m_text->toPlainText(),
+					ui->m_line_edit->text());
 				undo->setText(tr("Edit the text field"));
 			}
-			if (ui->m_size_sb->value() != m_text->font().pointSize()) {
+			if (ui->m_size_sb->value() != m_text->font().pointSize())
+			{
 				QFont font = m_text->font();
 				font.setPointSize(ui->m_size_sb->value());
-				undo = new QPropertyUndoCommand(m_text.data(), "font", m_text->font(), font);
+				undo = new QPropertyUndoCommand(
+					m_text.data(),
+					"font",
+					m_text->font(),
+					font);
 				undo->setText(tr("Change the size of a text field"));
 			}
-			if (m_font_is_selected &&
-				m_selected_font != m_text->font()) {
-				undo = new QPropertyUndoCommand(m_text.data(), "font", m_text->font(), m_selected_font);
+			if (m_font_is_selected && m_selected_font != m_text->font())
+			{
+				undo = new QPropertyUndoCommand(
+					m_text.data(),
+					"font",
+					m_text->font(),
+					m_selected_font);
 				undo->setText(tr("Change the font of a text field"));
 			}
-			if (ui->m_width_sb->value() != spinBoxWidth(m_text->textWidth())) {
-				undo = new QPropertyUndoCommand(m_text.data(), "textWidth", m_text->textWidth(), qreal(ui->m_width_sb->value()));
+			if (ui->m_width_sb->value() != spinBoxWidth(m_text->textWidth()))
+			{
+				undo = new QPropertyUndoCommand(
+					m_text.data(),
+					"textWidth",
+					m_text->textWidth(),
+					qreal(ui->m_width_sb->value()));
 				undo->setText(tr("Change the width of a text field"));
 			}
-			
+			if (m_layer_cb && m_text)
+			{
+				const QString new_layer = m_layer_cb->currentData().toString();
+				if (new_layer != m_text->layer())
+				{
+					undo = new QPropertyUndoCommand(
+						m_text.data(),
+						"layer",
+						QVariant(m_text->layer()),
+						QVariant(new_layer));
+					undo->setText(tr("Change the layer of a text"));
+				}
+			}
+
 			return undo;
 		}
-		else //several text are edited, only size and rotation is available for edition
+		else // several text are edited, only size and rotation is available for
+			 // edition
 		{
-			QUndoCommand *parent_undo = nullptr;
-			bool size_equal = true;
-			bool angle_equal = true;
-			bool font_equal = true;
-			bool width_equal = true;
-			qreal rotation_ = m_text_list.first()->rotation();
-			int size_ = m_text_list.first()->font().pointSize();
-			QFont font_ = m_text_list.first()->font();
+			QUndoCommand* parent_undo = nullptr;
+			bool		  size_equal  = true;
+			bool		  angle_equal = true;
+			bool		  font_equal  = true;
+			bool		  width_equal = true;
+			qreal		  rotation_	  = m_text_list.first()->rotation();
+			int			  size_		  = m_text_list.first()->font().pointSize();
+			QFont		  font_		  = m_text_list.first()->font();
 			int width_ = spinBoxWidth(m_text_list.first()->textWidth());
 			for (QPointer<IndependentTextItem> piti : m_text_list)
 			{
-				if (piti->rotation() != rotation_) {
-					angle_equal = false;
-				}
-				if (piti->font().pointSize() != size_) {
-					size_equal = false;
-				}
-				if (piti->font() != font_) {
-					font_equal = false;
-				}
-				if (spinBoxWidth(piti->textWidth()) != width_) {
+				if (piti->rotation() != rotation_) { angle_equal = false; }
+				if (piti->font().pointSize() != size_) { size_equal = false; }
+				if (piti->font() != font_) { font_equal = false; }
+				if (spinBoxWidth(piti->textWidth()) != width_)
+				{
 					width_equal = false;
 				}
 			}
-				
-			if ((angle_equal && (ui->m_angle_sb->value() != rotation_)) ||
-				(!angle_equal && (ui->m_angle_sb->value() != ui->m_angle_sb->minimum())))
+
+			if ((angle_equal && (ui->m_angle_sb->value() != rotation_))
+				|| (! angle_equal
+					&& (ui->m_angle_sb->value() != ui->m_angle_sb->minimum())))
 			{
 				for (QPointer<IndependentTextItem> piti : m_text_list)
 				{
 					if (piti)
 					{
-						if (!parent_undo) {
-							parent_undo = new QUndoCommand(tr("Rotate multiple text fields"));
+						if (! parent_undo)
+						{
+							parent_undo = new QUndoCommand(
+								tr("Rotate multiple text fields"));
 						}
-						QPropertyUndoCommand *qpuc = new QPropertyUndoCommand(piti.data(), "rotation", QVariant(piti->rotation()), QVariant(ui->m_angle_sb->value()), parent_undo);
+						QPropertyUndoCommand* qpuc = new QPropertyUndoCommand(
+							piti.data(),
+							"rotation",
+							QVariant(piti->rotation()),
+							QVariant(ui->m_angle_sb->value()),
+							parent_undo);
 						qpuc->setAnimated(true, false);
 					}
 				}
 			}
-			else if ((size_equal && (ui->m_size_sb->value() != size_)) ||
-					 (!size_equal && (ui->m_size_sb->value() != ui->m_size_sb->minimum())))
+			else if (
+				(size_equal && (ui->m_size_sb->value() != size_))
+				|| (! size_equal
+					&& (ui->m_size_sb->value() != ui->m_size_sb->minimum())))
 			{
 				for (QPointer<IndependentTextItem> piti : m_text_list)
 				{
 					if (piti)
 					{
-						if (!parent_undo) {
-							parent_undo = new QUndoCommand(tr("Change the size of multiple text fields"));
+						if (! parent_undo)
+						{
+							parent_undo = new QUndoCommand(
+								tr("Change the size of multiple text fields"));
 						}
 						QFont font = piti->font();
 						font.setPointSize(ui->m_size_sb->value());
-						new QPropertyUndoCommand(piti.data(), "font", QVariant(piti->font()), QVariant(font), parent_undo);
+						new QPropertyUndoCommand(
+							piti.data(),
+							"font",
+							QVariant(piti->font()),
+							QVariant(font),
+							parent_undo);
 					}
 				}
 			}
-			else if ((m_font_is_selected && !font_equal) ||
-					 (m_font_is_selected && (font_equal && (m_selected_font != font_))))
+			else if (
+				(m_font_is_selected && ! font_equal)
+				|| (m_font_is_selected
+					&& (font_equal && (m_selected_font != font_))))
 			{
 				for (QPointer<IndependentTextItem> piti : m_text_list)
 				{
 					if (piti)
 					{
-						if (!parent_undo) {
-							parent_undo = new QUndoCommand(tr("Change the font of several text fields"));
+						if (! parent_undo)
+						{
+							parent_undo = new QUndoCommand(
+								tr("Change the font of several text fields"));
 						}
-						new QPropertyUndoCommand(piti.data(), "font", piti->font(), m_selected_font, parent_undo);
+						new QPropertyUndoCommand(
+							piti.data(),
+							"font",
+							piti->font(),
+							m_selected_font,
+							parent_undo);
 					}
 				}
 			}
-			else if ((width_equal && (ui->m_width_sb->value() != width_)) ||
-					 (!width_equal && (ui->m_width_sb->value() != ui->m_width_sb->minimum())))
+			else if (
+				(width_equal && (ui->m_width_sb->value() != width_))
+				|| (! width_equal
+					&& (ui->m_width_sb->value() != ui->m_width_sb->minimum())))
 			{
 				for (QPointer<IndependentTextItem> piti : m_text_list)
 				{
 					if (piti)
 					{
-						if (!parent_undo) {
-							parent_undo = new QUndoCommand(tr("Change the width of several text fields"));
+						if (! parent_undo)
+						{
+							parent_undo = new QUndoCommand(
+								tr("Change the width of several text fields"));
 						}
-						new QPropertyUndoCommand(piti.data(), "textWidth", piti->textWidth(), qreal(ui->m_width_sb->value()), parent_undo);
+						new QPropertyUndoCommand(
+							piti.data(),
+							"textWidth",
+							piti->textWidth(),
+							qreal(ui->m_width_sb->value()),
+							parent_undo);
+					}
+				}
+			}
+			if (m_layer_cb)
+			{
+				const QString new_layer = m_layer_cb->currentData().toString();
+				for (QPointer<IndependentTextItem> piti : m_text_list)
+				{
+					if (piti && piti->layer() != new_layer)
+					{
+						if (! parent_undo)
+							parent_undo = new QUndoCommand(
+								tr("Change the layer of multiple text fields"));
+						new QPropertyUndoCommand(
+							piti.data(),
+							"layer",
+							QVariant(piti->layer()),
+							QVariant(new_layer),
+							parent_undo);
 					}
 				}
 			}
 			return parent_undo;
 		}
 	}
-		//In mode not live edit, only one text can be edited
+	// In mode not live edit, only one text can be edited
 	else if (m_text_list.isEmpty())
 	{
-		QUndoCommand *undo = new QUndoCommand(tr("Modify the properties of a text"));
-		if(ui->m_x_sb->value() != m_text->pos().x()) {
-			new QPropertyUndoCommand(m_text.data(), "x", QVariant(m_text->pos().x()), QVariant(ui->m_x_sb->value()), undo);
+		QUndoCommand* undo =
+			new QUndoCommand(tr("Modify the properties of a text"));
+		if (ui->m_x_sb->value() != m_text->pos().x())
+		{
+			new QPropertyUndoCommand(
+				m_text.data(),
+				"x",
+				QVariant(m_text->pos().x()),
+				QVariant(ui->m_x_sb->value()),
+				undo);
 		}
-		if(ui->m_y_sb->value() != m_text->pos().y()) {
-			new QPropertyUndoCommand(m_text.data(), "y", QVariant(m_text->pos().y()), QVariant(ui->m_y_sb->value()), undo);
+		if (ui->m_y_sb->value() != m_text->pos().y())
+		{
+			new QPropertyUndoCommand(
+				m_text.data(),
+				"y",
+				QVariant(m_text->pos().y()),
+				QVariant(ui->m_y_sb->value()),
+				undo);
 		}
-		if(ui->m_angle_sb->value() != m_text->rotation()) {
-			new QPropertyUndoCommand(m_text.data(), "rotation", QVariant(m_text->rotation()), QVariant(ui->m_angle_sb->value()), undo);
+		if (ui->m_angle_sb->value() != m_text->rotation())
+		{
+			new QPropertyUndoCommand(
+				m_text.data(),
+				"rotation",
+				QVariant(m_text->rotation()),
+				QVariant(ui->m_angle_sb->value()),
+				undo);
 		}
-		if (ui->m_line_edit->text() != m_text->toPlainText()) {
-			new ChangeDiagramTextCommand(m_text.data(), m_text->toHtml(), ui->m_line_edit->text(), undo);
+		if (ui->m_line_edit->text() != m_text->toPlainText())
+		{
+			new ChangeDiagramTextCommand(
+				m_text.data(),
+				m_text->toHtml(),
+				ui->m_line_edit->text(),
+				undo);
 		}
 		if (ui->m_size_sb->value() != m_text->font().pointSize())
 		{
 			QFont font = m_text->font();
 			font.setPointSize(ui->m_size_sb->value());
-			new QPropertyUndoCommand(m_text.data(), "font", m_text->font(), font, undo);
+			new QPropertyUndoCommand(
+				m_text.data(),
+				"font",
+				m_text->font(),
+				font,
+				undo);
 		}
-		if (m_font_is_selected && m_selected_font != m_text->font()) {
-			new QPropertyUndoCommand(m_text.data(), "font", m_text->font(), m_selected_font, undo);
+		if (m_font_is_selected && m_selected_font != m_text->font())
+		{
+			new QPropertyUndoCommand(
+				m_text.data(),
+				"font",
+				m_text->font(),
+				m_selected_font,
+				undo);
 		}
-		if (ui->m_width_sb->value() != spinBoxWidth(m_text->textWidth())) {
-			new QPropertyUndoCommand(m_text.data(), "textWidth", m_text->textWidth(), qreal(ui->m_width_sb->value()), undo);
+		if (ui->m_width_sb->value() != spinBoxWidth(m_text->textWidth()))
+		{
+			new QPropertyUndoCommand(
+				m_text.data(),
+				"textWidth",
+				m_text->textWidth(),
+				qreal(ui->m_width_sb->value()),
+				undo);
 		}
-		
-		if (undo->childCount()) {
-			return undo;
-		} else {
+		if (m_layer_cb && m_text)
+		{
+			const QString new_layer = m_layer_cb->currentData().toString();
+			if (new_layer != m_text->layer())
+			{
+				new QPropertyUndoCommand(
+					m_text.data(),
+					"layer",
+					QVariant(m_text->layer()),
+					QVariant(new_layer),
+					undo);
+			}
+		}
+
+		if (undo->childCount()) { return undo; }
+		else
+		{
 			return nullptr;
 		}
 	}
-	else {
+	else
+	{
 		return nullptr;
 	}
 }
 
 /**
 	@brief IndiTextPropertiesWidget::setUpEditConnection
-	Disconnect the previous connection, and reconnect the connection between the editors widgets and void IndiTextPropertiesWidget::apply function
+	Disconnect the previous connection, and reconnect the connection between the
+   editors widgets and void IndiTextPropertiesWidget::apply function
 */
 void IndiTextPropertiesWidget::setUpEditConnection()
 {
-	for (QMetaObject::Connection c : m_edit_connection) {
-		disconnect(c);
-	}
+	for (QMetaObject::Connection c : m_edit_connection) { disconnect(c); }
 	m_edit_connection.clear();
-	
+
 	if (m_text_list.isEmpty())
 	{
-		m_edit_connection << connect(ui->m_x_sb, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &IndiTextPropertiesWidget::apply);
-		m_edit_connection << connect(ui->m_y_sb, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &IndiTextPropertiesWidget::apply);
-		m_edit_connection << connect(ui->m_line_edit, &QLineEdit::textEdited, this, &IndiTextPropertiesWidget::apply);
+		m_edit_connection << connect(
+			ui->m_x_sb,
+			QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this,
+			&IndiTextPropertiesWidget::apply);
+		m_edit_connection << connect(
+			ui->m_y_sb,
+			QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this,
+			&IndiTextPropertiesWidget::apply);
+		m_edit_connection << connect(
+			ui->m_line_edit,
+			&QLineEdit::textEdited,
+			this,
+			&IndiTextPropertiesWidget::apply);
 	}
-	m_edit_connection << connect(ui->m_angle_sb, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &IndiTextPropertiesWidget::apply);
-	m_edit_connection << connect(ui->m_width_sb, QOverload<int>::of(&QSpinBox::valueChanged), this, &IndiTextPropertiesWidget::apply);
-	m_edit_connection << connect(ui->m_size_sb, QOverload<int>::of(&QSpinBox::valueChanged), [this]()
+	m_edit_connection << connect(
+		ui->m_angle_sb,
+		QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+		this,
+		&IndiTextPropertiesWidget::apply);
+	m_edit_connection << connect(
+		ui->m_width_sb,
+		QOverload<int>::of(&QSpinBox::valueChanged),
+		this,
+		&IndiTextPropertiesWidget::apply);
+	m_edit_connection << connect(
+		ui->m_size_sb,
+		QOverload<int>::of(&QSpinBox::valueChanged),
+		[this]()
+		{
+			this->m_selected_font.setPointSize(ui->m_size_sb->value());
+			this->apply();
+		});
+	if (m_layer_cb)
 	{
-		this->m_selected_font.setPointSize(ui->m_size_sb->value());
-		this->apply();
-	});
+		m_edit_connection << connect(
+			m_layer_cb,
+			QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this,
+			&IndiTextPropertiesWidget::apply);
+	}
 }
 
 /**
@@ -388,22 +591,19 @@ void IndiTextPropertiesWidget::setUpEditConnection()
 */
 void IndiTextPropertiesWidget::updateUi()
 {
-	if (!m_text && m_text_list.isEmpty()) {
-		return;
-	}
+	if (! m_text && m_text_list.isEmpty()) { return; }
 
-		//Disconnect every connections of editor widgets
-		//to avoid an unwanted edition (QSpinBox emit valueChanged no matter if changer by user or by program)
-	for (QMetaObject::Connection c : m_edit_connection) {
-		disconnect(c);
-	}
+	// Disconnect every connections of editor widgets
+	// to avoid an unwanted edition (QSpinBox emit valueChanged no matter if
+	// changer by user or by program)
+	for (QMetaObject::Connection c : m_edit_connection) { disconnect(c); }
 	m_edit_connection.clear();
-	
+
 	ui->m_x_sb->setEnabled(m_text_list.isEmpty() ? true : false);
 	ui->m_y_sb->setEnabled(m_text_list.isEmpty() ? true : false);
 	ui->m_line_edit->setEnabled(m_text_list.isEmpty() ? true : false);
 	ui->m_advanced_editor_pb->setEnabled(m_text_list.isEmpty() ? true : false);
-	
+
 	if (m_text_list.isEmpty())
 	{
 		ui->m_x_sb->setValue(m_text->pos().x());
@@ -412,49 +612,45 @@ void IndiTextPropertiesWidget::updateUi()
 		ui->m_angle_sb->setValue(m_text->rotation());
 		ui->m_size_sb->setValue(m_text->font().pointSize());
 		ui->m_width_sb->setValue(spinBoxWidth(m_text->textWidth()));
-		
+
 		ui->m_line_edit->setDisabled(m_text->isHtml() ? true : false);
 		ui->m_size_sb->setDisabled(m_text->isHtml() ? true : false);
 		ui->m_label->setVisible(m_text->isHtml() ? true : false);
 		ui->m_break_html_pb->setVisible(m_text->isHtml() ? true : false);
 		ui->m_font_pb->setDisabled(m_text->isHtml() ? true : false);
-		ui->m_font_pb->setText(m_text->isHtml() ? tr("Font") : m_text->font().family());
+		ui->m_font_pb->setText(
+			m_text->isHtml() ? tr("Font") : m_text->font().family());
 	}
 	else
 	{
-		bool size_equal = true;
-		bool angle_equal = true;
-		bool font_equal = true;
-		bool width_equal = true;
-		qreal rotation_ = m_text_list.first()->rotation();
-		int size_ = m_text_list.first()->font().pointSize();
-		QFont font_ = m_text_list.first()->font();
-		int width_ = spinBoxWidth(m_text_list.first()->textWidth());
+		bool  size_equal  = true;
+		bool  angle_equal = true;
+		bool  font_equal  = true;
+		bool  width_equal = true;
+		qreal rotation_	  = m_text_list.first()->rotation();
+		int	  size_		  = m_text_list.first()->font().pointSize();
+		QFont font_		  = m_text_list.first()->font();
+		int	  width_	  = spinBoxWidth(m_text_list.first()->textWidth());
 
 		for (QPointer<IndependentTextItem> piti : m_text_list)
 		{
-			if (piti->rotation() != rotation_) {
-				angle_equal = false;
-			}
-			if (piti->font().pointSize() != size_) {
-				size_equal = false;
-			}
-			if (piti->font() != font_) {
-				font_equal = false;
-			}
-			if (spinBoxWidth(piti->textWidth()) != width_) {
+			if (piti->rotation() != rotation_) { angle_equal = false; }
+			if (piti->font().pointSize() != size_) { size_equal = false; }
+			if (piti->font() != font_) { font_equal = false; }
+			if (spinBoxWidth(piti->textWidth()) != width_)
+			{
 				width_equal = false;
 			}
 		}
 		ui->m_angle_sb->setValue(angle_equal ? rotation_ : 0);
-			//Different widths show the minimum, as the other boxes do
-		ui->m_width_sb->setValue(width_equal ? width_ : ui->m_width_sb->minimum());
-		
+		// Different widths show the minimum, as the other boxes do
+		ui->m_width_sb->setValue(
+			width_equal ? width_ : ui->m_width_sb->minimum());
+
 		bool valid_ = true;
-		for (QPointer<IndependentTextItem> piti : m_text_list) {
-			if (piti->isHtml()) {
-				valid_ = false;
-			}
+		for (QPointer<IndependentTextItem> piti : m_text_list)
+		{
+			if (piti->isHtml()) { valid_ = false; }
 		}
 		ui->m_font_pb->setEnabled(valid_);
 		ui->m_font_pb->setText(font_equal ? font_.family() : tr("Font"));
@@ -464,8 +660,39 @@ void IndiTextPropertiesWidget::updateUi()
 		ui->m_break_html_pb->setVisible(true);
 	}
 
-	
-		//Set the connection now
+	if (m_layer_cb)
+	{
+		m_layer_cb->blockSignals(true);
+		m_layer_cb->clear();
+		m_layer_cb->addItem(tr("<None>"), QString());
+		Diagram* d = m_text ? m_text->diagram() :
+							  (! m_text_list.isEmpty() && m_text_list.first() ?
+								   m_text_list.first()->diagram() :
+								   nullptr);
+		if (d && d->project())
+		{
+			const auto& dlayers = d->project()->drawingLayers();
+			for (const QString& name : dlayers.names())
+			{
+				if (DrawingLayers::isFixed(name)) continue;
+				const QString desc = dlayers.description(name);
+				const QString label =
+					desc.isEmpty() ? name :
+									 QStringLiteral("%1 - %2").arg(name, desc);
+				m_layer_cb->addItem(label, name);
+			}
+		}
+		const QString cur_layer =
+			m_text ? m_text->layer() :
+					 (! m_text_list.isEmpty() && m_text_list.first() ?
+						  m_text_list.first()->layer() :
+						  QString());
+		const int idx = m_layer_cb->findData(cur_layer);
+		if (idx >= 0) m_layer_cb->setCurrentIndex(idx);
+		m_layer_cb->blockSignals(false);
+	}
+
+	// Set the connection now
 	setUpEditConnection();
 }
 
@@ -474,39 +701,41 @@ void IndiTextPropertiesWidget::updateUi()
 */
 void IndiTextPropertiesWidget::on_m_advanced_editor_pb_clicked()
 {
-	if (m_text) {
-		m_text->edit();
-	}
+	if (m_text) { m_text->edit(); }
 }
 
 void IndiTextPropertiesWidget::on_m_break_html_pb_clicked()
 {
-	if (m_text) {
-		m_text->setPlainText(m_text->toPlainText());
-	}
-	for (QPointer<IndependentTextItem> piti : m_text_list) {
+	if (m_text) { m_text->setPlainText(m_text->toPlainText()); }
+	for (QPointer<IndependentTextItem> piti : m_text_list)
+	{
 		piti->setPlainText(piti->toPlainText());
 	}
-	
+
 	updateUi();
 }
 
 void IndiTextPropertiesWidget::on_m_font_pb_clicked()
 {
-	if (!m_text && m_text_list.isEmpty()) {
-		return;
-	}
-	bool ok;
-	QFont font = m_text ? m_text->font() : m_text_list.first()->font();
-	m_selected_font = QFontDialog::getFont(&ok, font, this, QString(),
-										   QFontDialog::DontUseNativeDialog);
-	if (ok) {
+	if (! m_text && m_text_list.isEmpty()) { return; }
+	bool  ok;
+	QFont font		= m_text ? m_text->font() : m_text_list.first()->font();
+	m_selected_font = QFontDialog::getFont(
+		&ok,
+		font,
+		this,
+		QString(),
+		QFontDialog::DontUseNativeDialog);
+	if (ok)
+	{
 		m_font_is_selected = true;
 		ui->m_font_pb->setText(font.family());
 		ui->m_size_sb->setValue(font.pointSize());
 		LastUsedStyle::setTextFont(m_selected_font);
 		apply();
-	} else {
+	}
+	else
+	{
 		ui->m_font_pb->setText(tr("Font"));
 		m_font_is_selected = false;
 	}

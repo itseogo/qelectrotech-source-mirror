@@ -158,6 +158,10 @@ namespace DrawingLayers
 	QByteArray exportToXml(const Set& set);
 	bool	   importFromXml(
 			  Set& set, const QByteArray& xml_content, int* imported_count = nullptr);
+
+	QList<Layer> standardPresetLayers();
+	QList<Group> standardPresetGroups();
+	void		 loadStandardPresets(Set& set);
 } // namespace DrawingLayers
 
 #endif // DRAWINGLAYERS_H

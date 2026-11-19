@@ -20,11 +20,13 @@
 
 #include <PropertiesEditor/propertieseditorwidget.h>
 
-namespace Ui {
+namespace Ui
+{
 	class ShapeGraphicsItemPropertiesWidget;
 }
 
 class QetShapeItem;
+class QComboBox;
 
 /**
 	@brief The ShapeGraphicsItemPropertiesWidget class
@@ -32,38 +34,44 @@ class QetShapeItem;
 */
 class ShapeGraphicsItemPropertiesWidget : public PropertiesEditorWidget
 {
-		Q_OBJECT
+	Q_OBJECT
 
-	public:
-		explicit ShapeGraphicsItemPropertiesWidget(QetShapeItem *item, QWidget *parent = nullptr);
-		ShapeGraphicsItemPropertiesWidget(QList<QetShapeItem *> items_list, QWidget *parent =nullptr);
-		~ShapeGraphicsItemPropertiesWidget() override;
+  public:
+	explicit ShapeGraphicsItemPropertiesWidget(
+		QetShapeItem* item, QWidget* parent = nullptr);
+	ShapeGraphicsItemPropertiesWidget(
+		QList<QetShapeItem*> items_list, QWidget* parent = nullptr);
+	~ShapeGraphicsItemPropertiesWidget() override;
 
-		void setItem(QetShapeItem *shape);
-		void setItems(QList<QetShapeItem *> shapes_list);
+	void setItem(QetShapeItem* shape);
+	void setItems(QList<QetShapeItem*> shapes_list);
 
-	public slots:
-		void apply() override;
-		void reset() override;
-	public:
-		QUndoCommand* associatedUndo() const override;
-		QString title() const override { return tr("Edit the properties of a primitive "); }
-		void updateUi() override;
-		bool setLiveEdit(bool live_edit) override;
+  public slots:
+	void apply() override;
+	void reset() override;
 
-	private:
-		void setUpEditConnection();
-		void clearEditConnection();
+  public:
+	QUndoCommand* associatedUndo() const override;
+	QString		  title() const override
+	{
+		return tr("Edit the properties of a primitive ");
+	}
+	void updateUi() override;
+	bool setLiveEdit(bool live_edit) override;
 
-	private slots:
-		void on_m_lock_pos_cb_clicked();
+  private:
+	void setUpEditConnection();
+	void clearEditConnection();
 
-	private:
-		Ui::ShapeGraphicsItemPropertiesWidget *ui;
-		QetShapeItem *m_shape;
-		QList <QPointer<QetShapeItem>> m_shapes_list;
-		QList <QMetaObject::Connection> m_connect_list,
-										m_edit_connection;
+  private slots:
+	void on_m_lock_pos_cb_clicked();
+
+  private:
+	Ui::ShapeGraphicsItemPropertiesWidget* ui;
+	QetShapeItem*						   m_shape;
+	QList<QPointer<QetShapeItem>>		   m_shapes_list;
+	QList<QMetaObject::Connection>		   m_connect_list, m_edit_connection;
+	QComboBox*							   m_layer_cb = nullptr;
 };
 
 #endif // SHAPEGRAPHICSITEMPROPERTIESWIDGET_H
