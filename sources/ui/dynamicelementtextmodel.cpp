@@ -55,6 +55,22 @@ namespace
 	}
 } // namespace
 
+static QString
+layerDisplayString(DynamicElementTextItem* deti, const QString& layer_name)
+{
+	if (layer_name.isEmpty()) return QObject::tr("<None>");
+	if (deti && deti->diagram() && deti->diagram()->project())
+	{
+		const QString desc =
+			deti->diagram()->project()->drawingLayers().description(layer_name);
+		if (! desc.isEmpty())
+		{
+			return QStringLiteral("%1 - %2").arg(layer_name, desc);
+		}
+	}
+	return layer_name;
+}
+
 static int src_txt_row	  = 0;
 static int usr_txt_row	  = 1;
 static int info_txt_row	  = 2;
@@ -488,26 +504,23 @@ DynamicElementTextModel::itemsForText(DynamicElementTextItem* deti)
 		qsi_list.clear();
 		qsi_list << alignment << alignmenta;
 		qsi->appendRow(qsi_list);
-
-		// Layer
-		QStandardItem* layer_item = new QStandardItem(tr("Layer"));
-		layer_item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-
-		QStandardItem* layer_item_val = new QStandardItem;
-		const QString  current_layer  = DrawingLayers::layerOf(deti);
-		layer_item_val->setText(
-			current_layer.isEmpty() ? tr("<None>") : current_layer);
-		layer_item_val->setData(current_layer, Qt::UserRole + 2);
-		layer_item_val->setData(
-			DynamicElementTextModel::layer,
-			Qt::UserRole + 1);
-		layer_item_val->setFlags(
-			Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
-
-		qsi_list.clear();
-		qsi_list << layer_item << layer_item_val;
-		qsi->appendRow(qsi_list);
 	}
+
+	// Layer
+	QStandardItem* layer_item = new QStandardItem(tr("Layer"));
+	layer_item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+
+	QStandardItem* layer_item_val = new QStandardItem;
+	const QString  current_layer  = DrawingLayers::layerOf(deti);
+	layer_item_val->setText(layerDisplayString(deti, current_layer));
+	layer_item_val->setData(current_layer, Qt::UserRole + 2);
+	layer_item_val->setData(DynamicElementTextModel::layer, Qt::UserRole + 1);
+	layer_item_val->setFlags(
+		Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+
+	qsi_list.clear();
+	qsi_list << layer_item << layer_item_val;
+	qsi->appendRow(qsi_list);
 
 	qsi_list.clear();
 	QStandardItem* empty_qsi = new QStandardItem(0);
@@ -875,20 +888,25 @@ QUndoCommand* DynamicElementTextModel::undoForEditedText(
 		}
 	}
 
-	if (text_qsi->child(layer_txt_row, 1))
+	for (int r = 0; r < text_qsi->rowCount(); ++r)
 	{
-		const QString new_layer = text_qsi->child(layer_txt_row, 1)
-									  ->data(Qt::UserRole + 2)
-									  .toString();
-		if (new_layer != deti->layer())
+		QStandardItem* item = text_qsi->child(r, 1);
+		if (item
+			&& item->data(Qt::UserRole + 1).toInt()
+				   == DynamicElementTextModel::layer)
 		{
-			auto* quc = new QPropertyUndoCommand(
-				deti,
-				"layer",
-				QVariant(deti->layer()),
-				QVariant(new_layer),
-				undo);
-			quc->setText(tr("Change the layer of an element text"));
+			const QString new_layer = item->data(Qt::UserRole + 2).toString();
+			if (new_layer != deti->layer())
+			{
+				auto* quc = new QPropertyUndoCommand(
+					deti,
+					"layer",
+					QVariant(deti->layer()),
+					QVariant(new_layer),
+					undo);
+				quc->setText(tr("Change the layer of an element text"));
+			}
+			break;
 		}
 	}
 
@@ -1941,12 +1959,18 @@ void DynamicElementTextModel::updateDataFromText(
 	}
 	case layer:
 	{
-		if (qsi->child(layer_txt_row, 1))
+		for (int r = 0; r < qsi->rowCount(); ++r)
 		{
-			const QString l = deti->layer();
-			qsi->child(layer_txt_row, 1)
-				->setText(l.isEmpty() ? tr("<None>") : l);
-			qsi->child(layer_txt_row, 1)->setData(l, Qt::UserRole + 2);
+			QStandardItem* item = qsi->child(r, 1);
+			if (item
+				&& item->data(Qt::UserRole + 1).toInt()
+					   == DynamicElementTextModel::layer)
+			{
+				const QString l = deti->layer();
+				item->setText(layerDisplayString(deti, l));
+				item->setData(l, Qt::UserRole + 2);
+				break;
+			}
 		}
 		break;
 	}
@@ -2349,9 +2373,11 @@ void DynamicTextItemDelegate::setModelData(
 				{
 					QComboBox*	  cb		 = static_cast<QComboBox*>(editor);
 					const QString layer_name = cb->currentData().toString();
-					qsi->setData(
-						layer_name.isEmpty() ? tr("<None>") : layer_name,
-						Qt::DisplayRole);
+					const QString display_text =
+						cb->currentIndex() >= 0 ?
+							cb->currentText() :
+							(layer_name.isEmpty() ? tr("<None>") : layer_name);
+					qsi->setData(display_text, Qt::DisplayRole);
 					qsi->setData(layer_name, Qt::UserRole + 2);
 					return;
 				}

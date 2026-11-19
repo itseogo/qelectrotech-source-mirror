@@ -30,6 +30,7 @@
 #include "qetproject.h"
 #include "qetresult.h"
 #include "shownkinds.h"
+#include "ui/dynamicelementtextmodel.h"
 #include "ui/layersdialog.h"
 #include "undocommand/drawinglayerscommand.h"
 
@@ -757,6 +758,11 @@ class tst_drawinglayers : public QObject
 
 		DrawingLayers::applyTo(folio, without_bmk);
 		QVERIFY(! deti->isVisible());
+
+		// Verify DynamicElementTextModel creates layer entry
+		DynamicElementTextModel model(e);
+		QUndoCommand*			model_undo = model.undoForEditedText(deti);
+		delete model_undo;
 
 		// 5. Load standard layers in LayersDialog with undo/redo
 		QETProject	 project_dlg;
