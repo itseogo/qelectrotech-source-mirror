@@ -512,6 +512,10 @@ endfunction()
 # The Connections toolbar: a button per symbol on the wires, a click
 # places it, and the symbol of a button can be changed.
 qet_add_app_test(tst_connectionsymbols tst_connectionsymbols.cpp)
+
+# The junction element type: the connection symbol on a wire, which is never
+# numbered and never a terminal (#1500).
+qet_add_app_test(tst_junctiontype tst_junctiontype.cpp)
 target_compile_definitions(tst_connectionsymbols PRIVATE
   QET_ELEMENTS_DIR="${QET_DIR}/elements")
 # Connectivity-aware duplicate labels and clickable occurrences, through the
@@ -542,6 +546,8 @@ qet_add_app_test(tst_plcio tst_plcio.cpp)
 qet_add_app_test(tst_devicetype tst_devicetype.cpp)
 # Is a device drawn the way its type says: parts not drawn, symbols beyond.
 qet_add_app_test(tst_devicetypecheck tst_devicetypecheck.cpp)
+# The Device Navigator lists a device's free parts and places them
+qet_add_app_test(tst_devicenavigatorparts tst_devicenavigatorparts.cpp)
 qet_add_app_test(tst_placepartsafterhead tst_placepartsafterhead.cpp)
 # Project > Device types: the list of types and the editor of one
 qet_add_app_test(tst_devicetypeeditor tst_devicetypeeditor.cpp)
@@ -584,6 +590,9 @@ qet_add_app_test(tst_terminallist tst_terminallist.cpp)
 qet_add_app_test(tst_labelsfilecache tst_labelsfilecache.cpp)
 # The prefix dialog names the folders the way the collection panel does (#1802).
 qet_add_app_test(tst_prefixdialogtitles tst_prefixdialogtitles.cpp)
+# The prefix dialog also edits the company collection, and shows where the
+# user collection's prefix wins over it (#1918).
+qet_add_app_test(tst_companyprefixes tst_companyprefixes.cpp)
 # A quick second click on the same spot reaches the shape tools as a
 # double-click: it must still start the next line, rectangle or ellipse.
 qet_add_app_test(tst_shapequickclick tst_shapequickclick.cpp)
@@ -828,6 +837,10 @@ qet_add_app_test(tst_terminalstriporder tst_terminalstriporder.cpp)
 qet_add_app_test(tst_cabletarget tst_cabletarget.cpp)
 qet_add_app_test(tst_cablelist tst_cablelist.cpp)
 
+# What a junction's chain says: how a stub beside the strip names the wire
+# which ends on the junction, and where a cable list says each cable starts
+# and ends, neither of them naming the junction itself (#1500).
+qet_add_app_test(tst_junctionchain tst_junctionchain.cpp)
 # A wire dropped on a terminal that already has a wire is made.
 qet_add_app_test(tst_wireonusedterminal tst_wireonusedterminal.cpp)
 
