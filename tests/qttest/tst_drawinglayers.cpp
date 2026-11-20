@@ -32,6 +32,7 @@
 #include "qetresult.h"
 #include "shownkinds.h"
 #include "ui/dynamicelementtextmodel.h"
+#include "ui/imagepropertieswidget.h"
 #include "ui/layersdialog.h"
 #include "undocommand/drawinglayerscommand.h"
 
@@ -221,16 +222,16 @@ class tst_drawinglayers : public QObject
 		QVERIFY(table);
 		QVERIFY(dialog.addLayer(QStringLiteral("Quote")));
 		QVERIFY(! dialog.addLayer(QStringLiteral("Quote")));
-		QCOMPARE(table->rowCount(), 6);
-		QCOMPARE(table->item(5, 0)->text(), QStringLiteral("Quote"));
+		QCOMPARE(table->rowCount(), 7);
+		QCOMPARE(table->item(6, 0)->text(), QStringLiteral("Quote"));
 		shape->setSelected(true);
 		QCOMPARE(dialog.putSelectionOnLayer(QStringLiteral("Quote"), folio), 1);
 		QCOMPARE(DrawingLayers::layerOf(shape), QStringLiteral("Quote"));
 		// Unticking in the table hides what is on it
-		table->item(5, 3)->setCheckState(Qt::Unchecked);
+		table->item(6, 3)->setCheckState(Qt::Unchecked);
 		QVERIFY(! project.drawingLayers().isVisible(QStringLiteral("Quote")));
 		QVERIFY(! shape->isVisible());
-		table->item(5, 3)->setCheckState(Qt::Checked);
+		table->item(6, 3)->setCheckState(Qt::Checked);
 		QVERIFY(shape->isVisible());
 		// A rename follows on the items and in the groups
 		QVERIFY(dialog.addGroup(QStringLiteral("Customer")));
@@ -247,12 +248,12 @@ class tst_drawinglayers : public QObject
 		// Undo through the stack comes back to the dialog
 		project.undoStack()->undo();
 		QCOMPARE(DrawingLayers::layerOf(shape), QStringLiteral("Quote"));
-		QCOMPARE(table->item(5, 0)->text(), QStringLiteral("Quote"));
+		QCOMPARE(table->item(6, 0)->text(), QStringLiteral("Quote"));
 		project.undoStack()->redo();
 		// Removing a layer keeps what was on it, on no layer
 		dialog.removeLayer(QStringLiteral("Offer"));
 		QVERIFY(project.drawingLayers().userLayers().isEmpty());
-		QCOMPARE(project.drawingLayers().fixedLayers().size(), 5);
+		QCOMPARE(project.drawingLayers().fixedLayers().size(), 6);
 		QCOMPARE(DrawingLayers::layerOf(shape), QString());
 		QVERIFY(shape->isVisible());
 		QVERIFY(project.drawingLayers().groups.first().layers.isEmpty());
@@ -283,7 +284,7 @@ class tst_drawinglayers : public QObject
 		{
 			ProjectPrintWindow window(&project, new QPrinter());
 			auto*			   choice = window.findChild<QComboBox*>(
-				 QStringLiteral("m_layer_group_cb"));
+				QStringLiteral("m_layer_group_cb"));
 			QVERIFY(choice);
 			QCOMPARE(choice->count(), 2);
 			choice->setCurrentIndex(1);
@@ -442,7 +443,7 @@ class tst_drawinglayers : public QObject
 		{
 			ProjectPrintWindow window(&project, new QPrinter());
 			auto*			   choice = window.findChild<QComboBox*>(
-				 QStringLiteral("m_layer_group_cb"));
+				QStringLiteral("m_layer_group_cb"));
 			QVERIFY(choice);
 			choice->setCurrentIndex(1); // Select "No Wire Numbers"
 			QVERIFY(! cond_text->isVisible());
@@ -525,8 +526,8 @@ class tst_drawinglayers : public QObject
 			QStringLiteral("3D layout"));
 		dialog.addLayer(QStringLiteral("Electronics"), QStringLiteral("PCBs"));
 
-		// 5 fixed layers + 2 added = 7 rows
-		QCOMPARE(table->rowCount(), 7);
+		// 6 fixed layers + 2 added = 8 rows
+		QCOMPARE(table->rowCount(), 8);
 
 		// Filter by "mechanic" -> only Mechanics should be visible
 		dialog.filterLayers(QStringLiteral("mechanic"));
@@ -586,7 +587,7 @@ class tst_drawinglayers : public QObject
 		DrawingLayers::Set imported_csv_set;
 		int				   count = 0;
 		QVERIFY(DrawingLayers::importFromCsv(imported_csv_set, csv, &count));
-		QCOMPARE(count, 6); // 5 fixed system layers + 1 user layer
+		QCOMPARE(count, 7); // 6 fixed system layers + 1 user layer
 		QVERIFY(imported_csv_set.contains(QStringLiteral("Notes")));
 		QCOMPARE(
 			imported_csv_set.description(QStringLiteral("Notes")),
@@ -625,7 +626,7 @@ class tst_drawinglayers : public QObject
 		QVERIFY(! xml_bytes.isEmpty());
 		DrawingLayers::Set xml_set;
 		QVERIFY(DrawingLayers::importFromXml(xml_set, xml_bytes, &count));
-		QCOMPARE(count, 7); // 5 fixed layers + 2 user layers
+		QCOMPARE(count, 8); // 6 fixed layers + 2 user layers
 		QVERIFY(xml_set.contains(QStringLiteral("100_Grafik")));
 		QVERIFY(xml_set.contains(QStringLiteral("109_Kommentar")));
 		QCOMPARE(
@@ -667,7 +668,7 @@ class tst_drawinglayers : public QObject
 		DrawingLayers::loadStandardPresets(preset_set);
 		QCOMPARE(
 			preset_set.layers.size(),
-			16); // 5 fixed system layers + 11 preset layers
+			17); // 6 fixed system layers + 11 preset layers
 
 		const QStringList expected_layers = {
 			QStringLiteral("100"),
@@ -838,6 +839,9 @@ class tst_drawinglayers : public QObject
 		QCOMPARE(
 			DrawingLayers::fixedKindName(DrawingLayers::FixedKind::Graphics),
 			QStringLiteral("50"));
+		QCOMPARE(
+			DrawingLayers::fixedKindName(DrawingLayers::FixedKind::Pictures),
+			QStringLiteral("60"));
 
 		QETProject	 project;
 		LayersDialog dlg(&project);
@@ -849,9 +853,10 @@ class tst_drawinglayers : public QObject
 		QCOMPARE(table->item(2, 0)->text(), QStringLiteral("30"));
 		QCOMPARE(table->item(3, 0)->text(), QStringLiteral("40"));
 		QCOMPARE(table->item(4, 0)->text(), QStringLiteral("50"));
+		QCOMPARE(table->item(5, 0)->text(), QStringLiteral("60"));
 
-		// New IndependentTextItem, QetShapeItem and DiagramImageItem default to
-		// layer 50
+		// New IndependentTextItem and QetShapeItem default to layer 50,
+		// DiagramImageItem defaults to layer 60
 		IndependentTextItem new_text;
 		QCOMPARE(new_text.layer(), QStringLiteral("50"));
 
@@ -862,7 +867,21 @@ class tst_drawinglayers : public QObject
 		QCOMPARE(new_shape.layer(), QStringLiteral("50"));
 
 		DiagramImageItem new_image;
+		QCOMPARE(new_image.layer(), QStringLiteral("60"));
+
+		Diagram* folio = project.addNewDiagram();
+		folio->addItem(&new_image);
+		ImagePropertiesWidget img_widget(&new_image);
+		auto* layer_combo = img_widget.findChild<QComboBox*>("m_layer_cb");
+		QVERIFY(layer_combo);
+		QCOMPARE(layer_combo->currentData().toString(), QStringLiteral("60"));
+		img_widget.setLiveEdit(true);
+		const int idx50 = layer_combo->findData(QStringLiteral("50"));
+		QVERIFY(idx50 >= 0);
+		layer_combo->setCurrentIndex(idx50);
 		QCOMPARE(new_image.layer(), QStringLiteral("50"));
+		project.undoStack()->undo();
+		QCOMPARE(new_image.layer(), QStringLiteral("60"));
 	}
 };
 

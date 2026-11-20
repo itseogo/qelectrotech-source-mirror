@@ -51,8 +51,8 @@ namespace
 	void paintColorButton(QPushButton* button, const QColor& color)
 	{
 		const QString obj = button->objectName().isEmpty() ?
-			QStringLiteral("layerColorBtn") :
-			button->objectName();
+								QStringLiteral("layerColorBtn") :
+								button->objectName();
 		if (button->objectName().isEmpty()) button->setObjectName(obj);
 
 		if (color.isValid())
@@ -76,11 +76,13 @@ namespace
 		}
 		else
 		{
-			button->setStyleSheet(QStringLiteral(
-				"#%1 { background-color: #000000; color: #FFFFFF; "
-				"font-weight: bold; border: 1px solid #333333; border-radius: "
-				"2px; padding: 2px 6px; }")
-				.arg(obj));
+			button->setStyleSheet(
+				QStringLiteral(
+					"#%1 { background-color: #000000; color: #FFFFFF; "
+					"font-weight: bold; border: 1px solid #333333; "
+					"border-radius: "
+					"2px; padding: 2px 6px; }")
+					.arg(obj));
 			button->setIcon(QIcon());
 			button->setText(QObject::tr("Default"));
 			button->setToolTip(
@@ -429,7 +431,10 @@ void LayersDialog::updateButtonStates()
 							&& (! fixed
 								|| current
 									   == DrawingLayers::fixedKindName(
-										   DrawingLayers::FixedKind::Graphics));
+										   DrawingLayers::FixedKind::Graphics)
+								|| current
+									   == DrawingLayers::fixedKindName(
+										   DrawingLayers::FixedKind::Pictures));
 
 	if (m_rename_btn) m_rename_btn->setEnabled(has_selection && ! fixed);
 	if (m_remove_btn) m_remove_btn->setEnabled(has_selection && ! fixed);
@@ -732,7 +737,10 @@ int LayersDialog::putSelectionOnLayer(const QString& layer, Diagram* folio)
 	const bool is_fixed = DrawingLayers::isFixed(layer)
 						  && layer
 								 != DrawingLayers::fixedKindName(
-									 DrawingLayers::FixedKind::Graphics);
+									 DrawingLayers::FixedKind::Graphics)
+						  && layer
+								 != DrawingLayers::fixedKindName(
+									 DrawingLayers::FixedKind::Pictures);
 	if (! m_project || is_fixed) return 0;
 	if (! folio)
 	{

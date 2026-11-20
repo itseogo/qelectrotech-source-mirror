@@ -60,7 +60,7 @@
 DiagramImageItem::DiagramImageItem(QetGraphicsItem *parent_item):
 	QetGraphicsItem(parent_item)
 {
-	DrawingLayers::setLayerOf(this, QStringLiteral("50"));
+	DrawingLayers::setLayerOf(this, QStringLiteral("60"));
 	ShownKinds::tag(this, ShownKinds::Pictures);
 	setFlags(QGraphicsItem::ItemIsSelectable|QGraphicsItem::ItemIsMovable|QGraphicsItem::ItemSendsGeometryChanges);
 	setAcceptHoverEvents(true);
@@ -78,7 +78,7 @@ DiagramImageItem::DiagramImageItem(const QPixmap &pixmap, QetGraphicsItem *paren
 	m_base_pixmap(pixmap),
 	m_crop_rect(pixmap.rect())
 {
-	DrawingLayers::setLayerOf(this, QStringLiteral("50"));
+	DrawingLayers::setLayerOf(this, QStringLiteral("60"));
 	ShownKinds::tag(this, ShownKinds::Pictures);
 	// m_transform.toMatrix(), not QGraphicsItem::setRotation()/setScale():
 	// those are a single uniform scale() float, which is exactly why an

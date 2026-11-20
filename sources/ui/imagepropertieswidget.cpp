@@ -19,8 +19,10 @@
 
 #include <QPropertyUndoCommand/qpropertyundocommand.h>
 #include <diagram.h>
+#include <drawinglayers/drawinglayers.h>
 #include <qetgraphicsitem/diagramimageitem.h>
 #include <qeticons.h>
+#include <qetproject.h>
 #include <ui_imagepropertieswidget.h>
 #include <QSignalBlocker>
 #include <QDialog>
@@ -84,12 +86,14 @@ void ImagePropertiesWidget::setImageItem(DiagramImageItem *image)
 		disconnect(m_image, &DiagramImageItem::transformChanged, this, &ImagePropertiesWidget::updateUi);
 		disconnect(m_image, &DiagramImageItem::labelChanged, this, &ImagePropertiesWidget::updateUi);
 		disconnect(m_image, &DiagramImageItem::adaptToDarkThemeChanged, this, &ImagePropertiesWidget::updateUi);
+		disconnect(m_image, &DiagramImageItem::layerChanged, this, &ImagePropertiesWidget::updateUi);
 	}
 
 	m_image = image;
 	connect(m_image, &DiagramImageItem::transformChanged, this, &ImagePropertiesWidget::updateUi);
 	connect(m_image, &DiagramImageItem::labelChanged, this, &ImagePropertiesWidget::updateUi);
 	connect(m_image, &DiagramImageItem::adaptToDarkThemeChanged, this, &ImagePropertiesWidget::updateUi);
+	connect(m_image, &DiagramImageItem::layerChanged, this, &ImagePropertiesWidget::updateUi);
 	m_movable = image->isMovable();
 	m_adapt_to_dark_theme = image->adaptToDarkTheme();
 	m_scaleX = m_image->scaleFactorX();
@@ -98,6 +102,7 @@ void ImagePropertiesWidget::setImageItem(DiagramImageItem *image)
 	m_skewX = m_image->skewX();
 	m_skewY = m_image->skewY();
 	m_label = m_image->label();
+	m_layer = m_image->layer();
 	updateUi();
 }
 
@@ -111,13 +116,21 @@ void ImagePropertiesWidget::apply()
 
 	if (m_image->diagram())
 	{
-		if (m_live_edit) disconnect(m_image, &DiagramImageItem::transformChanged, this, &ImagePropertiesWidget::updateUi);
+		if (m_live_edit)
+		{
+			disconnect(m_image, &DiagramImageItem::transformChanged, this, &ImagePropertiesWidget::updateUi);
+			disconnect(m_image, &DiagramImageItem::layerChanged, this, &ImagePropertiesWidget::updateUi);
+		}
 
 		QUndoCommand *undo = associatedUndo();
 		if (undo)
 			m_image->diagram()->undoStack().push(undo);
 
-		if (m_live_edit) connect(m_image, &DiagramImageItem::transformChanged, this, &ImagePropertiesWidget::updateUi);
+		if (m_live_edit)
+		{
+			connect(m_image, &DiagramImageItem::transformChanged, this, &ImagePropertiesWidget::updateUi);
+			connect(m_image, &DiagramImageItem::layerChanged, this, &ImagePropertiesWidget::updateUi);
+		}
 	}
 
 	m_scaleX = m_image->scaleFactorX();
@@ -127,6 +140,7 @@ void ImagePropertiesWidget::apply()
 	m_skewY = m_image->skewY();
 	m_label = m_image->label();
 	m_adapt_to_dark_theme = m_image->adaptToDarkTheme();
+	m_layer = m_image->layer();
 }
 
 /**
@@ -144,6 +158,7 @@ void ImagePropertiesWidget::reset()
 	m_image->setSkewY(m_skewY);
 	m_image->setLabel(m_label);
 	m_image->setMovable(m_movable);
+	m_image->setLayer(m_layer);
 	m_preview_dark_theme = true;
 	m_image->setAdaptToDarkTheme(m_adapt_to_dark_theme);
 	m_preview_dark_theme = false;
@@ -170,6 +185,7 @@ bool ImagePropertiesWidget::setLiveEdit(bool live_edit)
 		connect (ui->m_skew_y_sb, &QDoubleSpinBox::editingFinished, this, &ImagePropertiesWidget::apply);
 		connect (ui->m_label_le, &QLineEdit::editingFinished, this, &ImagePropertiesWidget::apply);
 		connect (ui->m_adapt_to_dark_theme_cb, &QCheckBox::clicked, this, &ImagePropertiesWidget::apply);
+		connect (ui->m_layer_cb, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ImagePropertiesWidget::apply);
 	}
 	else
 	{
@@ -180,6 +196,7 @@ bool ImagePropertiesWidget::setLiveEdit(bool live_edit)
 		disconnect (ui->m_skew_y_sb, &QDoubleSpinBox::editingFinished, this, &ImagePropertiesWidget::apply);
 		disconnect (ui->m_label_le, &QLineEdit::editingFinished, this, &ImagePropertiesWidget::apply);
 		disconnect (ui->m_adapt_to_dark_theme_cb, &QCheckBox::clicked, this, &ImagePropertiesWidget::apply);
+		disconnect (ui->m_layer_cb, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ImagePropertiesWidget::apply);
 	}
 
 	return true;
@@ -247,6 +264,27 @@ QUndoCommand* ImagePropertiesWidget::associatedUndo() const
 			new QPropertyUndoCommand(m_image, "adaptToDarkTheme", m_adapt_to_dark_theme, adapt, undo);
 		}
 	}
+
+	if (ui->m_layer_cb && m_image)
+	{
+		const QString new_layer = ui->m_layer_cb->currentData().toString();
+		if (new_layer != m_layer)
+		{
+			if (m_image->diagram() && m_image->diagram()->project() && !new_layer.isEmpty())
+			{
+				m_image->diagram()->project()->ensureDrawingLayer(new_layer);
+			}
+			if (undo)
+			{
+				new QPropertyUndoCommand(m_image, "layer", m_layer, new_layer, undo);
+			}
+			else
+			{
+				undo = new QPropertyUndoCommand(m_image, "layer", m_layer, new_layer);
+				undo->setText(tr("Change the layer of an image"));
+			}
+		}
+	}
 	return undo;
 }
 
@@ -282,6 +320,30 @@ void ImagePropertiesWidget::updateUi()
 	ui->m_lock_pos_cb->setChecked(!m_image->isMovable());
 	if (ui->m_label_le->text() != m_image->label())
 		ui->m_label_le->setText(m_image->label());
+
+	if (ui->m_layer_cb)
+	{
+		ui->m_layer_cb->blockSignals(true);
+		ui->m_layer_cb->clear();
+		ui->m_layer_cb->addItem(tr("<None>"), QString());
+		Diagram* d = m_image ? m_image->diagram() : nullptr;
+		DrawingLayers::Set dlayers;
+		if (d && d->project()) { dlayers = d->project()->drawingLayers(); }
+		for (const auto& pair : DrawingLayers::availableLayerChoices(dlayers))
+		{
+			const QString label =
+				pair.second.isEmpty() ?
+					pair.first :
+					QStringLiteral("%1 - %2").arg(pair.first, pair.second);
+			ui->m_layer_cb->addItem(label, pair.first);
+		}
+		const QString cur_layer = m_image ? m_image->layer() : QString();
+		const int idx = ui->m_layer_cb->findData(cur_layer);
+		if (idx >= 0) ui->m_layer_cb->setCurrentIndex(idx);
+		else
+			ui->m_layer_cb->setCurrentIndex(0);
+		ui->m_layer_cb->blockSignals(false);
+	}
 }
 
 /**
