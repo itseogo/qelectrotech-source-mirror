@@ -63,8 +63,9 @@ layerDisplayString(DynamicElementTextItem* deti, const QString& layer_name)
 			   == DrawingLayers::fixedKindName(
 				   DrawingLayers::FixedKind::SymbolTexts))
 	{
-		return DrawingLayers::fixedKindDisplayName(
-			DrawingLayers::FixedKind::SymbolTexts);
+		return QStringLiteral("30 - ")
+			   + DrawingLayers::fixedKindDisplayName(
+				   DrawingLayers::FixedKind::SymbolTexts);
 	}
 	if (deti && deti->diagram() && deti->diagram()->project())
 	{
@@ -548,7 +549,9 @@ DynamicElementTextModel::itemsForText(DynamicElementTextItem* deti)
 	@param deti
 */
 void DynamicElementTextModel::addText(DynamicElementTextItem* deti)
-{ this->appendRow(itemsForText(deti)); }
+{
+	this->appendRow(itemsForText(deti));
+}
 
 /**
 	@brief DynamicElementTextModel::removeText
@@ -2158,8 +2161,10 @@ QWidget* DynamicTextItemDelegate::createEditor(
 			detm ? detm->textFromIndex(index) : nullptr;
 		QComboBox* qcb = new QComboBox(parent);
 		qcb->setObjectName("layer_combo");
-		const QString symbol_texts_label = DrawingLayers::fixedKindDisplayName(
-			DrawingLayers::FixedKind::SymbolTexts);
+		const QString symbol_texts_label =
+			QStringLiteral("30 - ")
+			+ DrawingLayers::fixedKindDisplayName(
+				DrawingLayers::FixedKind::SymbolTexts);
 		qcb->addItem(symbol_texts_label, QString());
 		if (deti && deti->diagram() && deti->diagram()->project())
 		{
@@ -2167,6 +2172,7 @@ QWidget* DynamicTextItemDelegate::createEditor(
 			for (const auto& pair :
 				 DrawingLayers::availableLayerChoices(dlayers))
 			{
+				if (pair.first == QStringLiteral("30")) continue;
 				const QString label =
 					pair.second.isEmpty() ?
 						pair.first :
@@ -2175,7 +2181,13 @@ QWidget* DynamicTextItemDelegate::createEditor(
 			}
 		}
 		const QString current_layer = index.data(Qt::UserRole + 2).toString();
-		const int	  idx			= qcb->findData(current_layer);
+		int			  idx			= qcb->findData(current_layer);
+		if (idx < 0
+			&& (current_layer.isEmpty()
+				|| current_layer == QStringLiteral("30")))
+		{
+			idx = 0;
+		}
 		if (idx >= 0) qcb->setCurrentIndex(idx);
 		else
 			qcb->setCurrentIndex(0);
@@ -2392,8 +2404,10 @@ void DynamicTextItemDelegate::setModelData(
 						cb->currentIndex() >= 0 ?
 							cb->currentText() :
 							(layer_name.isEmpty() ?
-								 DrawingLayers::fixedKindDisplayName(
-									 DrawingLayers::FixedKind::SymbolTexts) :
+								 QStringLiteral("30 - ")
+									 + DrawingLayers::fixedKindDisplayName(
+										 DrawingLayers::FixedKind::
+											 SymbolTexts) :
 								 layer_name);
 					qsi->setData(display_text, Qt::DisplayRole);
 					qsi->setData(layer_name, Qt::UserRole + 2);

@@ -52,21 +52,33 @@ namespace
 	{
 		if (color.isValid())
 		{
-			QPixmap swatch(32, 14);
-			swatch.fill(color);
-			button->setIcon(QIcon(swatch));
-			button->setIconSize(swatch.size());
-			button->setText(color.name().toUpper());
+			const QString hex = color.name().toUpper();
+			const double  lum = 0.299 * color.red() + 0.587 * color.green()
+							   + 0.114 * color.blue();
+			const QString text_color = lum > 140 ? QStringLiteral("#000000") :
+												   QStringLiteral("#FFFFFF");
+			button->setStyleSheet(
+				QStringLiteral(
+					"QPushButton { background-color: %1; color: %2; "
+					"font-weight: bold; border: 1px solid #555555; "
+					"border-radius: 2px; padding: 2px 6px; }")
+					.arg(hex, text_color));
+			button->setIcon(QIcon());
+			button->setText(hex);
 			button->setToolTip(
-				color.name().toUpper() + QStringLiteral(" (")
-				+ QObject::tr("Right-click to reset") + QStringLiteral(")"));
+				hex + QStringLiteral(" (") + QObject::tr("Right-click to reset")
+				+ QStringLiteral(")"));
 		}
 		else
 		{
+			button->setStyleSheet(QStringLiteral(
+				"QPushButton { background-color: #000000; color: #FFFFFF; "
+				"font-weight: bold; border: 1px solid #333333; border-radius: "
+				"2px; padding: 2px 6px; }"));
 			button->setIcon(QIcon());
 			button->setText(QObject::tr("Default"));
 			button->setToolTip(
-				QObject::tr("Individual element color (no override)"));
+				QObject::tr("Individual element color (default: #000000)"));
 		}
 	}
 } // namespace
@@ -407,10 +419,15 @@ void LayersDialog::updateButtonStates()
 	const QString current		= currentLayer();
 	const bool	  has_selection = ! current.isEmpty();
 	const bool	  fixed			= DrawingLayers::isFixed(current);
+	const bool	  can_put		= has_selection
+						 && (! fixed
+							 || current
+									== DrawingLayers::fixedKindName(
+										DrawingLayers::FixedKind::Graphics));
 
 	if (m_rename_btn) m_rename_btn->setEnabled(has_selection && ! fixed);
 	if (m_remove_btn) m_remove_btn->setEnabled(has_selection && ! fixed);
-	if (m_put_btn) m_put_btn->setEnabled(has_selection && ! fixed);
+	if (m_put_btn) m_put_btn->setEnabled(can_put);
 }
 
 void LayersDialog::filterLayers(const QString& filter_text)
@@ -706,7 +723,11 @@ void LayersDialog::setLayerDescription(
 */
 int LayersDialog::putSelectionOnLayer(const QString& layer, Diagram* folio)
 {
-	if (! m_project || DrawingLayers::isFixed(layer)) return 0;
+	const bool is_fixed = DrawingLayers::isFixed(layer)
+						  && layer
+								 != DrawingLayers::fixedKindName(
+									 DrawingLayers::FixedKind::Graphics);
+	if (! m_project || is_fixed) return 0;
 	if (! folio)
 	{
 		if (auto* editor = qobject_cast<QETDiagramEditor*>(parentWidget()))

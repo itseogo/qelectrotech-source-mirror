@@ -22,6 +22,7 @@
 #include "qetapptest.h"
 #include "qetgraphicsitem/conductortextitem.h"
 #include "qetgraphicsitem/crossrefitem.h"
+#include "qetgraphicsitem/diagramimageitem.h"
 #include "qetgraphicsitem/dynamicelementtextitem.h"
 #include "qetgraphicsitem/independenttextitem.h"
 #include "qetgraphicsitem/qetshapeitem.h"
@@ -220,16 +221,16 @@ class tst_drawinglayers : public QObject
 		QVERIFY(table);
 		QVERIFY(dialog.addLayer(QStringLiteral("Quote")));
 		QVERIFY(! dialog.addLayer(QStringLiteral("Quote")));
-		QCOMPARE(table->rowCount(), 5);
-		QCOMPARE(table->item(4, 0)->text(), QStringLiteral("Quote"));
+		QCOMPARE(table->rowCount(), 6);
+		QCOMPARE(table->item(5, 0)->text(), QStringLiteral("Quote"));
 		shape->setSelected(true);
 		QCOMPARE(dialog.putSelectionOnLayer(QStringLiteral("Quote"), folio), 1);
 		QCOMPARE(DrawingLayers::layerOf(shape), QStringLiteral("Quote"));
 		// Unticking in the table hides what is on it
-		table->item(4, 3)->setCheckState(Qt::Unchecked);
+		table->item(5, 3)->setCheckState(Qt::Unchecked);
 		QVERIFY(! project.drawingLayers().isVisible(QStringLiteral("Quote")));
 		QVERIFY(! shape->isVisible());
-		table->item(4, 3)->setCheckState(Qt::Checked);
+		table->item(5, 3)->setCheckState(Qt::Checked);
 		QVERIFY(shape->isVisible());
 		// A rename follows on the items and in the groups
 		QVERIFY(dialog.addGroup(QStringLiteral("Customer")));
@@ -246,12 +247,12 @@ class tst_drawinglayers : public QObject
 		// Undo through the stack comes back to the dialog
 		project.undoStack()->undo();
 		QCOMPARE(DrawingLayers::layerOf(shape), QStringLiteral("Quote"));
-		QCOMPARE(table->item(4, 0)->text(), QStringLiteral("Quote"));
+		QCOMPARE(table->item(5, 0)->text(), QStringLiteral("Quote"));
 		project.undoStack()->redo();
 		// Removing a layer keeps what was on it, on no layer
 		dialog.removeLayer(QStringLiteral("Offer"));
 		QVERIFY(project.drawingLayers().userLayers().isEmpty());
-		QCOMPARE(project.drawingLayers().fixedLayers().size(), 4);
+		QCOMPARE(project.drawingLayers().fixedLayers().size(), 5);
 		QCOMPARE(DrawingLayers::layerOf(shape), QString());
 		QVERIFY(shape->isVisible());
 		QVERIFY(project.drawingLayers().groups.first().layers.isEmpty());
@@ -524,8 +525,8 @@ class tst_drawinglayers : public QObject
 			QStringLiteral("3D layout"));
 		dialog.addLayer(QStringLiteral("Electronics"), QStringLiteral("PCBs"));
 
-		// 4 fixed layers + 2 added = 6 rows
-		QCOMPARE(table->rowCount(), 6);
+		// 5 fixed layers + 2 added = 7 rows
+		QCOMPARE(table->rowCount(), 7);
 
 		// Filter by "mechanic" -> only Mechanics should be visible
 		dialog.filterLayers(QStringLiteral("mechanic"));
@@ -585,7 +586,7 @@ class tst_drawinglayers : public QObject
 		DrawingLayers::Set imported_csv_set;
 		int				   count = 0;
 		QVERIFY(DrawingLayers::importFromCsv(imported_csv_set, csv, &count));
-		QCOMPARE(count, 5); // 4 fixed system layers + 1 user layer
+		QCOMPARE(count, 6); // 5 fixed system layers + 1 user layer
 		QVERIFY(imported_csv_set.contains(QStringLiteral("Notes")));
 		QCOMPARE(
 			imported_csv_set.description(QStringLiteral("Notes")),
@@ -624,7 +625,7 @@ class tst_drawinglayers : public QObject
 		QVERIFY(! xml_bytes.isEmpty());
 		DrawingLayers::Set xml_set;
 		QVERIFY(DrawingLayers::importFromXml(xml_set, xml_bytes, &count));
-		QCOMPARE(count, 6); // 4 fixed layers + 2 user layers
+		QCOMPARE(count, 7); // 5 fixed layers + 2 user layers
 		QVERIFY(xml_set.contains(QStringLiteral("100_Grafik")));
 		QVERIFY(xml_set.contains(QStringLiteral("109_Kommentar")));
 		QCOMPARE(
@@ -666,7 +667,7 @@ class tst_drawinglayers : public QObject
 		DrawingLayers::loadStandardPresets(preset_set);
 		QCOMPARE(
 			preset_set.layers.size(),
-			15); // 4 fixed system layers + 11 preset layers
+			16); // 5 fixed system layers + 11 preset layers
 
 		const QStringList expected_layers = {
 			QStringLiteral("100"),
@@ -834,6 +835,9 @@ class tst_drawinglayers : public QObject
 			DrawingLayers::fixedKindName(
 				DrawingLayers::FixedKind::CrossReferences),
 			QStringLiteral("40"));
+		QCOMPARE(
+			DrawingLayers::fixedKindName(DrawingLayers::FixedKind::Graphics),
+			QStringLiteral("50"));
 
 		QETProject	 project;
 		LayersDialog dlg(&project);
@@ -844,10 +848,21 @@ class tst_drawinglayers : public QObject
 		QCOMPARE(table->item(1, 0)->text(), QStringLiteral("20"));
 		QCOMPARE(table->item(2, 0)->text(), QStringLiteral("30"));
 		QCOMPARE(table->item(3, 0)->text(), QStringLiteral("40"));
+		QCOMPARE(table->item(4, 0)->text(), QStringLiteral("50"));
 
-		// New IndependentTextItem defaults to layer 108
+		// New IndependentTextItem, QetShapeItem and DiagramImageItem default to
+		// layer 50
 		IndependentTextItem new_text;
-		QCOMPARE(new_text.layer(), QStringLiteral("108"));
+		QCOMPARE(new_text.layer(), QStringLiteral("50"));
+
+		QetShapeItem new_shape(
+			QPointF(0, 0),
+			QPointF(10, 10),
+			QetShapeItem::Line);
+		QCOMPARE(new_shape.layer(), QStringLiteral("50"));
+
+		DiagramImageItem new_image;
+		QCOMPARE(new_image.layer(), QStringLiteral("50"));
 	}
 };
 

@@ -129,6 +129,7 @@ namespace DrawingLayers
 		case FixedKind::WireNumbers: return QStringLiteral("20");
 		case FixedKind::SymbolTexts: return QStringLiteral("30");
 		case FixedKind::CrossReferences: return QStringLiteral("40");
+		case FixedKind::Graphics: return QStringLiteral("50");
 		default: return QString();
 		}
 	}
@@ -142,6 +143,7 @@ namespace DrawingLayers
 		case FixedKind::WireNumbers: return QObject::tr("Wire numbers");
 		case FixedKind::SymbolTexts: return QObject::tr("Symbol texts");
 		case FixedKind::CrossReferences: return QObject::tr("Cross-references");
+		case FixedKind::Graphics: return QObject::tr("Graphics");
 		default: return QString();
 		}
 	}
@@ -156,6 +158,7 @@ namespace DrawingLayers
 		case FixedKind::SymbolTexts: return QStringLiteral("symbol_texts");
 		case FixedKind::CrossReferences:
 			return QStringLiteral("cross_references");
+		case FixedKind::Graphics: return QStringLiteral("graphics");
 		default: return QString();
 		}
 	}
@@ -170,6 +173,7 @@ namespace DrawingLayers
 			return FixedKind::SymbolTexts;
 		if (attr == QLatin1String("cross_references"))
 			return FixedKind::CrossReferences;
+		if (attr == QLatin1String("graphics")) return FixedKind::Graphics;
 		return FixedKind::None;
 	}
 
@@ -191,11 +195,17 @@ namespace DrawingLayers
 			|| name == QStringLiteral("Cross-references")
 			|| name == fixedKindDisplayName(FixedKind::CrossReferences))
 			return FixedKind::CrossReferences;
+		if (name == QStringLiteral("50") || name == QStringLiteral("Graphics")
+			|| name == QStringLiteral("Grafik")
+			|| name == fixedKindDisplayName(FixedKind::Graphics))
+			return FixedKind::Graphics;
 		return FixedKind::None;
 	}
 
 	bool isFixed(const QString& name)
-	{ return fixedKindOf(name) != FixedKind::None; }
+	{
+		return fixedKindOf(name) != FixedKind::None;
+	}
 
 	QList<Layer> defaultFixedLayers()
 	{
@@ -223,7 +233,13 @@ namespace DrawingLayers
 			 true,
 			 true,
 			 false,
-			 FixedKind::CrossReferences}};
+			 FixedKind::CrossReferences},
+			{fixedKindName(FixedKind::Graphics),
+			 fixedKindDisplayName(FixedKind::Graphics),
+			 true,
+			 true,
+			 false,
+			 FixedKind::Graphics}};
 	}
 
 	Set::Set() { ensureFixedLayers(); }
@@ -578,7 +594,9 @@ namespace DrawingLayers
 	}
 
 	QString layerOf(const QGraphicsItem* item)
-	{ return item ? item->data(LayerKey).toString() : QString(); }
+	{
+		return item ? item->data(LayerKey).toString() : QString();
+	}
 
 	void setLayerOf(QGraphicsItem* item, const QString& layer)
 	{
@@ -594,7 +612,9 @@ namespace DrawingLayers
 	}
 
 	void readAttribute(QGraphicsItem* item, const QDomElement& element)
-	{ setLayerOf(item, element.attribute(QStringLiteral("layer"))); }
+	{
+		setLayerOf(item, element.attribute(QStringLiteral("layer")));
+	}
 
 	bool canBeOnLayer(const QGraphicsItem* item)
 	{
@@ -1084,6 +1104,7 @@ namespace DrawingLayers
 		without_bmk << fixedKindName(FixedKind::FrameAndTitleBlock);
 		without_bmk << fixedKindName(FixedKind::WireNumbers);
 		without_bmk << fixedKindName(FixedKind::CrossReferences);
+		without_bmk << fixedKindName(FixedKind::Graphics);
 		without_bmk << QStringLiteral("100") << QStringLiteral("101")
 					<< QStringLiteral("102") << QStringLiteral("107")
 					<< QStringLiteral("108") << QStringLiteral("109")
@@ -1144,20 +1165,12 @@ namespace DrawingLayers
 		QList<QPair<QString, QString>> list;
 		QSet<QString>				   seen;
 
-		// 1. User layers from set
-		for (const Layer& layer : set.userLayers())
+		for (const Layer& layer : set.layers)
 		{
-			seen.insert(layer.name);
-			list.append({layer.name, layer.description});
-		}
-
-		// 2. Standard presets
-		for (const Layer& preset : standardPresetLayers())
-		{
-			if (! seen.contains(preset.name))
+			if (! seen.contains(layer.name))
 			{
-				seen.insert(preset.name);
-				list.append({preset.name, preset.description});
+				seen.insert(layer.name);
+				list.append({layer.name, layer.description});
 			}
 		}
 

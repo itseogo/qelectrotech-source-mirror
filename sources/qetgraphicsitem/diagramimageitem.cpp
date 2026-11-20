@@ -16,6 +16,7 @@
 	along with QElectroTech.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "../drawinglayers/drawinglayers.h"
+#include "../qetproject.h"
 #include "diagramimageitem.h"
 #include <palettegraphicsview.h>
 #include <darkimagerendering.h>
@@ -59,6 +60,7 @@
 DiagramImageItem::DiagramImageItem(QetGraphicsItem *parent_item):
 	QetGraphicsItem(parent_item)
 {
+	DrawingLayers::setLayerOf(this, QStringLiteral("50"));
 	ShownKinds::tag(this, ShownKinds::Pictures);
 	setFlags(QGraphicsItem::ItemIsSelectable|QGraphicsItem::ItemIsMovable|QGraphicsItem::ItemSendsGeometryChanges);
 	setAcceptHoverEvents(true);
@@ -76,6 +78,7 @@ DiagramImageItem::DiagramImageItem(const QPixmap &pixmap, QetGraphicsItem *paren
 	m_base_pixmap(pixmap),
 	m_crop_rect(pixmap.rect())
 {
+	DrawingLayers::setLayerOf(this, QStringLiteral("50"));
 	ShownKinds::tag(this, ShownKinds::Pictures);
 	// m_transform.toMatrix(), not QGraphicsItem::setRotation()/setScale():
 	// those are a single uniform scale() float, which is exactly why an
@@ -259,6 +262,22 @@ void DiagramImageItem::setAdaptToDarkTheme(bool adapt)
 	m_adapt_to_dark_theme = adapt;
 	update();
 	emit adaptToDarkThemeChanged();
+}
+
+QString DiagramImageItem::layer() const
+{
+	return DrawingLayers::layerOf(this);
+}
+
+void DiagramImageItem::setLayer(const QString &l)
+{
+	if (DrawingLayers::layerOf(this) == l) return;
+	DrawingLayers::setLayerOf(this, l);
+	if (diagram() && diagram()->project())
+	{
+		DrawingLayers::apply(this, diagram()->project()->drawingLayers());
+	}
+	emit layerChanged();
 }
 
 /**

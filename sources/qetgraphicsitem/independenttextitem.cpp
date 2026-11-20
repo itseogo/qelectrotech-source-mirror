@@ -40,7 +40,7 @@
 IndependentTextItem::IndependentTextItem() : DiagramTextItem(nullptr)
 {
 	ShownKinds::tag(this, ShownKinds::FreeTexts);
-	setLayer(QStringLiteral("108"));
+	setLayer(QStringLiteral("50"));
 	wrapAtWords();
 	// Start from the font last applied to a text item this session,
 	// falling back to the app-wide Preferences default otherwise.
@@ -61,7 +61,7 @@ IndependentTextItem::IndependentTextItem(const QString& text) :
 	DiagramTextItem(text, nullptr)
 {
 	ShownKinds::tag(this, ShownKinds::FreeTexts);
-	setLayer(QStringLiteral("108"));
+	setLayer(QStringLiteral("50"));
 	wrapAtWords();
 }
 

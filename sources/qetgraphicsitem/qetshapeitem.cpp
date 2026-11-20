@@ -63,6 +63,7 @@ QetShapeItem::QetShapeItem(
 	m_hovered(false)
 {
 	ShownKinds::tag(this, ShownKinds::Shapes);
+	setLayer(QStringLiteral("50"));
 	if (type == Polygon) m_polygon << m_P1 << m_P2;
 	setFlags(
 		QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable
@@ -1049,7 +1050,8 @@ bool QetShapeItem::sceneEventFilter(QGraphicsItem* watched, QEvent* event)
 					handlerMousePressEvent(m_vector_index);
 					return true;
 				}
-				else if (event->type() == QEvent::GraphicsSceneMouseMove) // Move
+				else if (
+					event->type() == QEvent::GraphicsSceneMouseMove) // Move
 				{
 					handlerMouseMoveEvent(
 						m_vector_index,

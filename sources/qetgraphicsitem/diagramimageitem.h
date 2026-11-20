@@ -50,6 +50,7 @@ class DiagramImageItem : public QetGraphicsItem {
 	Q_PROPERTY(qreal skewY READ skewY WRITE setSkewY NOTIFY transformChanged)
 	Q_PROPERTY(QPointF pivot READ pivot WRITE setPivot NOTIFY transformChanged)
 	Q_PROPERTY(QString label READ label WRITE setLabel NOTIFY labelChanged)
+	Q_PROPERTY(QString layer READ layer WRITE setLayer NOTIFY layerChanged)
 	// The picture's source -- original, crop rectangle, transparent
 	// colours -- as one value. The displayed pixmap is computed from it,
 	// so every edit of it (crop, colour key, mirror, replace) is one
@@ -177,6 +178,8 @@ class DiagramImageItem : public QetGraphicsItem {
 	void setLabel(const QString &label);
 	bool adaptToDarkTheme() const { return m_adapt_to_dark_theme; }
 	void setAdaptToDarkTheme(bool adapt);
+	QString layer() const;
+	void setLayer(const QString &l);
 
 	signals:
 	void pixmapChanged();
@@ -184,6 +187,7 @@ class DiagramImageItem : public QetGraphicsItem {
 	void uuidChanged();
 	void labelChanged();
 	void adaptToDarkThemeChanged();
+	void layerChanged();
 
 	protected:
 	void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) override;
