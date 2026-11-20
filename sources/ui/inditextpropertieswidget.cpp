@@ -53,8 +53,8 @@ IndiTextPropertiesWidget::IndiTextPropertiesWidget(
 	layer_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 	m_layer_cb = new QComboBox(this);
 	m_layer_cb->setObjectName(QStringLiteral("m_layer_cb"));
-	ui->gridLayout->addWidget(layer_label, 7, 0);
-	ui->gridLayout->addWidget(m_layer_cb, 7, 1, 1, 3);
+	ui->gridLayout->addWidget(layer_label, 4, 2);
+	ui->gridLayout->addWidget(m_layer_cb, 4, 3);
 	if (text) { setText(text); }
 }
 
@@ -72,8 +72,8 @@ IndiTextPropertiesWidget::IndiTextPropertiesWidget(
 	layer_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 	m_layer_cb = new QComboBox(this);
 	m_layer_cb->setObjectName(QStringLiteral("m_layer_cb"));
-	ui->gridLayout->addWidget(layer_label, 7, 0);
-	ui->gridLayout->addWidget(m_layer_cb, 7, 1, 1, 3);
+	ui->gridLayout->addWidget(layer_label, 4, 2);
+	ui->gridLayout->addWidget(m_layer_cb, 4, 3);
 	setText(text_list);
 }
 
@@ -285,6 +285,12 @@ QUndoCommand* IndiTextPropertiesWidget::associatedUndo() const
 				const QString new_layer = m_layer_cb->currentData().toString();
 				if (new_layer != m_text->layer())
 				{
+					if (m_text->diagram() && m_text->diagram()->project()
+						&& ! new_layer.isEmpty())
+					{
+						m_text->diagram()->project()->ensureDrawingLayer(
+							new_layer);
+					}
 					undo = new QPropertyUndoCommand(
 						m_text.data(),
 						"layer",
@@ -416,6 +422,19 @@ QUndoCommand* IndiTextPropertiesWidget::associatedUndo() const
 			if (m_layer_cb)
 			{
 				const QString new_layer = m_layer_cb->currentData().toString();
+				Diagram*	  d			= nullptr;
+				for (QPointer<IndependentTextItem> piti : m_text_list)
+				{
+					if (piti && piti->diagram())
+					{
+						d = piti->diagram();
+						break;
+					}
+				}
+				if (d && d->project() && ! new_layer.isEmpty())
+				{
+					d->project()->ensureDrawingLayer(new_layer);
+				}
 				for (QPointer<IndependentTextItem> piti : m_text_list)
 				{
 					if (piti && piti->layer() != new_layer)
@@ -509,6 +528,11 @@ QUndoCommand* IndiTextPropertiesWidget::associatedUndo() const
 			const QString new_layer = m_layer_cb->currentData().toString();
 			if (new_layer != m_text->layer())
 			{
+				if (m_text->diagram() && m_text->diagram()->project()
+					&& ! new_layer.isEmpty())
+				{
+					m_text->diagram()->project()->ensureDrawingLayer(new_layer);
+				}
 				new QPropertyUndoCommand(
 					m_text.data(),
 					"layer",
@@ -665,22 +689,19 @@ void IndiTextPropertiesWidget::updateUi()
 		m_layer_cb->blockSignals(true);
 		m_layer_cb->clear();
 		m_layer_cb->addItem(tr("<None>"), QString());
-		Diagram* d = m_text ? m_text->diagram() :
-							  (! m_text_list.isEmpty() && m_text_list.first() ?
-								   m_text_list.first()->diagram() :
-								   nullptr);
-		if (d && d->project())
+		Diagram*		   d = m_text ? m_text->diagram() :
+										(! m_text_list.isEmpty() && m_text_list.first() ?
+											 m_text_list.first()->diagram() :
+											 nullptr);
+		DrawingLayers::Set dlayers;
+		if (d && d->project()) { dlayers = d->project()->drawingLayers(); }
+		for (const auto& pair : DrawingLayers::availableLayerChoices(dlayers))
 		{
-			const auto& dlayers = d->project()->drawingLayers();
-			for (const QString& name : dlayers.names())
-			{
-				if (DrawingLayers::isFixed(name)) continue;
-				const QString desc = dlayers.description(name);
-				const QString label =
-					desc.isEmpty() ? name :
-									 QStringLiteral("%1 - %2").arg(name, desc);
-				m_layer_cb->addItem(label, name);
-			}
+			const QString label =
+				pair.second.isEmpty() ?
+					pair.first :
+					QStringLiteral("%1 - %2").arg(pair.first, pair.second);
+			m_layer_cb->addItem(label, pair.first);
 		}
 		const QString cur_layer =
 			m_text ? m_text->layer() :
@@ -689,6 +710,8 @@ void IndiTextPropertiesWidget::updateUi()
 						  QString());
 		const int idx = m_layer_cb->findData(cur_layer);
 		if (idx >= 0) m_layer_cb->setCurrentIndex(idx);
+		else
+			m_layer_cb->setCurrentIndex(0);
 		m_layer_cb->blockSignals(false);
 	}
 

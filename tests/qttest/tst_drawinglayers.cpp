@@ -226,10 +226,10 @@ class tst_drawinglayers : public QObject
 		QCOMPARE(dialog.putSelectionOnLayer(QStringLiteral("Quote"), folio), 1);
 		QCOMPARE(DrawingLayers::layerOf(shape), QStringLiteral("Quote"));
 		// Unticking in the table hides what is on it
-		table->item(4, 2)->setCheckState(Qt::Unchecked);
+		table->item(4, 3)->setCheckState(Qt::Unchecked);
 		QVERIFY(! project.drawingLayers().isVisible(QStringLiteral("Quote")));
 		QVERIFY(! shape->isVisible());
-		table->item(4, 2)->setCheckState(Qt::Checked);
+		table->item(4, 3)->setCheckState(Qt::Checked);
 		QVERIFY(shape->isVisible());
 		// A rename follows on the items and in the groups
 		QVERIFY(dialog.addGroup(QStringLiteral("Customer")));
@@ -782,6 +782,72 @@ class tst_drawinglayers : public QObject
 		project_dlg.undoStack()->redo();
 		QVERIFY(project_dlg.drawingLayers().contains(QStringLiteral("100")));
 		QVERIFY(project_dlg.drawingLayers().contains(QStringLiteral("400")));
+	}
+
+	void layerColorOverrideAndRestoration()
+	{
+		QETProject project;
+		Diagram*   folio = project.addNewDiagram();
+		auto*	   shape = line(folio, QStringLiteral("Mechanical"));
+		shape->setPen(QPen(Qt::blue));
+		QCOMPARE(shape->pen().color(), QColor(Qt::blue));
+
+		auto* iti = text(folio, QStringLiteral("Mechanical"));
+		iti->setColor(Qt::black);
+		QCOMPARE(iti->color(), QColor(Qt::black));
+
+		DrawingLayers::Set	 set = project.drawingLayers();
+		DrawingLayers::Layer l(QStringLiteral("Mechanical"));
+		set.layers.append(l);
+		project.setDrawingLayers(set);
+
+		// Layer has no color: original colors preserved
+		QCOMPARE(shape->pen().color(), QColor(Qt::blue));
+		QCOMPARE(iti->color(), QColor(Qt::black));
+
+		// Set layer color to red
+		set.setColor(QStringLiteral("Mechanical"), QColor(Qt::red));
+		project.setDrawingLayers(set);
+		QCOMPARE(shape->pen().color(), QColor(Qt::red));
+		QCOMPARE(iti->color(), QColor(Qt::red));
+
+		// Clear layer color: original colors restored
+		set.setColor(QStringLiteral("Mechanical"), QColor());
+		project.setDrawingLayers(set);
+		QCOMPARE(shape->pen().color(), QColor(Qt::blue));
+		QCOMPARE(iti->color(), QColor(Qt::black));
+	}
+
+	void fixedLayerNamesAndTableColumns()
+	{
+		QCOMPARE(
+			DrawingLayers::fixedKindName(
+				DrawingLayers::FixedKind::FrameAndTitleBlock),
+			QStringLiteral("10"));
+		QCOMPARE(
+			DrawingLayers::fixedKindName(DrawingLayers::FixedKind::WireNumbers),
+			QStringLiteral("20"));
+		QCOMPARE(
+			DrawingLayers::fixedKindName(DrawingLayers::FixedKind::SymbolTexts),
+			QStringLiteral("30"));
+		QCOMPARE(
+			DrawingLayers::fixedKindName(
+				DrawingLayers::FixedKind::CrossReferences),
+			QStringLiteral("40"));
+
+		QETProject	 project;
+		LayersDialog dlg(&project);
+		auto*		 table = dlg.findChild<QTableWidget*>("layersTable");
+		QVERIFY(table);
+		QCOMPARE(table->columnCount(), 6);
+		QCOMPARE(table->item(0, 0)->text(), QStringLiteral("10"));
+		QCOMPARE(table->item(1, 0)->text(), QStringLiteral("20"));
+		QCOMPARE(table->item(2, 0)->text(), QStringLiteral("30"));
+		QCOMPARE(table->item(3, 0)->text(), QStringLiteral("40"));
+
+		// New IndependentTextItem defaults to layer 108
+		IndependentTextItem new_text;
+		QCOMPARE(new_text.layer(), QStringLiteral("108"));
 	}
 };
 

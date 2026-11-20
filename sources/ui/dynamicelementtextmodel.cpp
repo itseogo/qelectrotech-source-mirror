@@ -58,7 +58,14 @@ namespace
 static QString
 layerDisplayString(DynamicElementTextItem* deti, const QString& layer_name)
 {
-	if (layer_name.isEmpty()) return QObject::tr("<None>");
+	if (layer_name.isEmpty()
+		|| layer_name
+			   == DrawingLayers::fixedKindName(
+				   DrawingLayers::FixedKind::SymbolTexts))
+	{
+		return DrawingLayers::fixedKindDisplayName(
+			DrawingLayers::FixedKind::SymbolTexts);
+	}
 	if (deti && deti->diagram() && deti->diagram()->project())
 	{
 		const QString desc =
@@ -898,6 +905,11 @@ QUndoCommand* DynamicElementTextModel::undoForEditedText(
 			const QString new_layer = item->data(Qt::UserRole + 2).toString();
 			if (new_layer != deti->layer())
 			{
+				if (deti->diagram() && deti->diagram()->project()
+					&& ! new_layer.isEmpty())
+				{
+					deti->diagram()->project()->ensureDrawingLayer(new_layer);
+				}
 				auto* quc = new QPropertyUndoCommand(
 					deti,
 					"layer",
@@ -2148,22 +2160,27 @@ QWidget* DynamicTextItemDelegate::createEditor(
 			detm ? detm->textFromIndex(index) : nullptr;
 		QComboBox* qcb = new QComboBox(parent);
 		qcb->setObjectName("layer_combo");
-		qcb->addItem(tr("<None>"), QString());
+		const QString symbol_texts_label = DrawingLayers::fixedKindDisplayName(
+			DrawingLayers::FixedKind::SymbolTexts);
+		qcb->addItem(symbol_texts_label, QString());
 		if (deti && deti->diagram() && deti->diagram()->project())
 		{
 			const auto& dlayers = deti->diagram()->project()->drawingLayers();
-			for (const QString& name : dlayers.names())
+			for (const auto& pair :
+				 DrawingLayers::availableLayerChoices(dlayers))
 			{
-				const QString desc = dlayers.description(name);
 				const QString label =
-					desc.isEmpty() ? name :
-									 QStringLiteral("%1 - %2").arg(name, desc);
-				qcb->addItem(label, name);
+					pair.second.isEmpty() ?
+						pair.first :
+						QStringLiteral("%1 - %2").arg(pair.first, pair.second);
+				qcb->addItem(label, pair.first);
 			}
 		}
 		const QString current_layer = index.data(Qt::UserRole + 2).toString();
 		const int	  idx			= qcb->findData(current_layer);
 		if (idx >= 0) qcb->setCurrentIndex(idx);
+		else
+			qcb->setCurrentIndex(0);
 		connect(
 			qcb,
 			&QComboBox::currentIndexChanged,
@@ -2376,7 +2393,10 @@ void DynamicTextItemDelegate::setModelData(
 					const QString display_text =
 						cb->currentIndex() >= 0 ?
 							cb->currentText() :
-							(layer_name.isEmpty() ? tr("<None>") : layer_name);
+							(layer_name.isEmpty() ?
+								 DrawingLayers::fixedKindDisplayName(
+									 DrawingLayers::FixedKind::SymbolTexts) :
+								 layer_name);
 					qsi->setData(display_text, Qt::DisplayRole);
 					qsi->setData(layer_name, Qt::UserRole + 2);
 					return;

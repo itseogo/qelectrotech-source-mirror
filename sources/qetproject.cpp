@@ -5750,6 +5750,16 @@ void QETProject::setDrawingLayers(const DrawingLayers::Set &layers)
 	if (changed) storeSettings();
 }
 
+void QETProject::ensureDrawingLayer(const QString &name)
+{
+	if (DrawingLayers::ensureLayer(m_drawing_layers, name))
+	{
+		for (Diagram *folio : folios())
+			DrawingLayers::applyTo(folio, m_drawing_layers);
+		storeSettings();
+	}
+}
+
 void QETProject::readDrawingLayersXml(QDomDocument &xml_project)
 {
 	m_drawing_layers = DrawingLayers::Set::fromXml(

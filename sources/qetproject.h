@@ -373,6 +373,7 @@ class QETProject : public QObject
 			/// The named layers of the project's free drawing
 		const DrawingLayers::Set &drawingLayers() const {return m_drawing_layers;}
 		void setDrawingLayers(const DrawingLayers::Set &layers);
+		void ensureDrawingLayer(const QString &name);
 		void removeDeviceType(const QString &name);
 		bool chainedReports() const;
 		void setChainedReports(bool enable);

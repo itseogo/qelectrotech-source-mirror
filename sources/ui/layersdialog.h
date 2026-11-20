@@ -49,6 +49,8 @@ class LayersDialog : public QDialog
 	void setLayerVisible(const QString& name, bool visible);
 	void setLayerPrintable(const QString& name, bool printable);
 	void setLayerLocked(const QString& name, bool locked);
+	void setLayerColor(const QString& name, const QColor& color);
+	void chooseLayerColor(const QString& name, QWidget* button = nullptr);
 	void setLayerDescription(const QString& name, const QString& description);
 	int	 putSelectionOnLayer(const QString& layer, Diagram* folio = nullptr);
 	bool addGroup(const QString& name);

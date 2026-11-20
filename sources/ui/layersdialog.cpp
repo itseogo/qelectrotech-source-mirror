@@ -18,6 +18,7 @@
 #include "layersdialog.h"
 
 #include <QApplication>
+#include <QColorDialog>
 #include <QDialogButtonBox>
 #include <QFile>
 #include <QFileDialog>
@@ -29,6 +30,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QUndoStack>
@@ -44,12 +46,37 @@
 #include <qetproject.h>
 #include <undocommand/drawinglayerscommand.h>
 
+namespace
+{
+	void paintColorButton(QPushButton* button, const QColor& color)
+	{
+		if (color.isValid())
+		{
+			QPixmap swatch(32, 14);
+			swatch.fill(color);
+			button->setIcon(QIcon(swatch));
+			button->setIconSize(swatch.size());
+			button->setText(color.name().toUpper());
+			button->setToolTip(
+				color.name().toUpper() + QStringLiteral(" (")
+				+ QObject::tr("Right-click to reset") + QStringLiteral(")"));
+		}
+		else
+		{
+			button->setIcon(QIcon());
+			button->setText(QObject::tr("Default"));
+			button->setToolTip(
+				QObject::tr("Individual element color (no override)"));
+		}
+	}
+} // namespace
+
 using DrawingLayers::Set;
 
 LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 	QDialog(parent),
 	m_project(project),
-	m_layers(new QTableWidget(0, 5, this)),
+	m_layers(new QTableWidget(0, 6, this)),
 	m_groups(new QListWidget(this)),
 	m_members(new QListWidget(this)),
 	m_summary(new QLabel(this))
@@ -80,9 +107,11 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 	layers_vbox->addLayout(filter_layout);
 
 	m_layers->setObjectName(QStringLiteral("layersTable"));
+	m_layers->setColumnCount(6);
 	m_layers->setHorizontalHeaderLabels(
 		{tr("Layer"),
 		 tr("Description"),
+		 tr("Color"),
 		 tr("Shown"),
 		 tr("Print"),
 		 tr("Locked")});
@@ -101,6 +130,9 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 		QHeaderView::ResizeToContents);
 	m_layers->horizontalHeader()->setSectionResizeMode(
 		4,
+		QHeaderView::ResizeToContents);
+	m_layers->horizontalHeader()->setSectionResizeMode(
+		5,
 		QHeaderView::ResizeToContents);
 	layers_vbox->addWidget(m_layers, 1);
 	layers_layout->addLayout(layers_vbox, 1);
@@ -270,17 +302,17 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 			{
 				setLayerDescription(layer_name, item->text().trimmed());
 			}
-			else if (item->column() == 2)
+			else if (item->column() == 3)
 			{
 				setLayerVisible(layer_name, item->checkState() == Qt::Checked);
 			}
-			else if (item->column() == 3)
+			else if (item->column() == 4)
 			{
 				setLayerPrintable(
 					layer_name,
 					item->checkState() == Qt::Checked);
 			}
-			else if (item->column() == 4)
+			else if (item->column() == 5)
 			{
 				setLayerLocked(layer_name, item->checkState() == Qt::Checked);
 			}
@@ -427,10 +459,7 @@ void LayersDialog::refresh()
 		const auto& l = set.layers.at(row);
 
 		// Col 0: Name
-		const QString display_name =
-			l.isFixed() ? DrawingLayers::fixedKindDisplayName(l.fixed_kind) :
-						  l.name;
-		auto* name_item = new QTableWidgetItem(display_name);
+		auto* name_item = new QTableWidgetItem(l.name);
 		name_item->setData(Qt::UserRole, l.name);
 		name_item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
 		m_layers->setItem(row, 0, name_item);
@@ -441,26 +470,60 @@ void LayersDialog::refresh()
 			Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable);
 		m_layers->setItem(row, 1, desc_item);
 
-		// Col 2: Shown
+		// Col 2: Color
+		auto* color_btn = new QPushButton(this);
+		color_btn->setObjectName(
+			QStringLiteral("layerColorBtn_%1").arg(l.name));
+		paintColorButton(color_btn, l.color);
+		color_btn->setContextMenuPolicy(Qt::CustomContextMenu);
+		connect(
+			color_btn,
+			&QPushButton::clicked,
+			this,
+			[this, layer_name = l.name, color_btn]()
+			{ chooseLayerColor(layer_name, color_btn); });
+		connect(
+			color_btn,
+			&QPushButton::customContextMenuRequested,
+			this,
+			[this, layer_name = l.name, color_btn](const QPoint& pos)
+			{
+				QMenu menu;
+				auto* reset_action =
+					menu.addAction(tr("Reset to individual color"));
+				auto* choose_action = menu.addAction(tr("Choose color..."));
+				auto* selected		= menu.exec(color_btn->mapToGlobal(pos));
+				if (selected == reset_action)
+				{
+					setLayerColor(layer_name, QColor());
+				}
+				else if (selected == choose_action)
+				{
+					chooseLayerColor(layer_name, color_btn);
+				}
+			});
+		m_layers->setCellWidget(row, 2, color_btn);
+
+		// Col 3: Shown
 		auto* shown = new QTableWidgetItem();
 		shown->setFlags(
 			Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
 		shown->setCheckState(l.visible ? Qt::Checked : Qt::Unchecked);
-		m_layers->setItem(row, 2, shown);
+		m_layers->setItem(row, 3, shown);
 
-		// Col 3: Print
+		// Col 4: Print
 		auto* printable = new QTableWidgetItem();
 		printable->setFlags(
 			Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
 		printable->setCheckState(l.printable ? Qt::Checked : Qt::Unchecked);
-		m_layers->setItem(row, 3, printable);
+		m_layers->setItem(row, 4, printable);
 
-		// Col 4: Locked
+		// Col 5: Locked
 		auto* locked = new QTableWidgetItem();
 		locked->setFlags(
 			Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
 		locked->setCheckState(l.locked ? Qt::Checked : Qt::Unchecked);
-		m_layers->setItem(row, 4, locked);
+		m_layers->setItem(row, 5, locked);
 
 		if (l.name == layer) m_layers->setCurrentCell(row, 0);
 	}
@@ -600,6 +663,27 @@ void LayersDialog::setLayerLocked(const QString& name, bool locked)
 		if (layer.name == name) layer.locked = locked;
 	if (set != m_project->drawingLayers())
 		m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
+}
+
+void LayersDialog::setLayerColor(const QString& name, const QColor& color)
+{
+	if (! m_project) return;
+	Set set = m_project->drawingLayers();
+	set.setColor(name, color);
+	if (set != m_project->drawingLayers())
+		m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
+}
+
+void LayersDialog::chooseLayerColor(const QString& name, QWidget* button)
+{
+	if (! m_project) return;
+	const QColor current_color = m_project->drawingLayers().color(name);
+	const QColor chosen		   = QColorDialog::getColor(
+		   current_color.isValid() ? current_color : Qt::black,
+		button ? button : this,
+		tr("Choose layer color"),
+		QColorDialog::ShowAlphaChannel);
+	if (chosen.isValid()) { setLayerColor(name, chosen); }
 }
 
 void LayersDialog::setLayerDescription(

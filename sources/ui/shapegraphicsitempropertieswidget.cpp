@@ -324,6 +324,12 @@ QUndoCommand* ShapeGraphicsItemPropertiesWidget::associatedUndo() const
 				const QString new_layer = m_layer_cb->currentData().toString();
 				if (new_layer != m_shape->layer())
 				{
+					if (m_shape->diagram() && m_shape->diagram()->project()
+						&& ! new_layer.isEmpty())
+					{
+						m_shape->diagram()->project()->ensureDrawingLayer(
+							new_layer);
+					}
 					if (undo)
 						new QPropertyUndoCommand(
 							m_shape,
@@ -460,6 +466,19 @@ QUndoCommand* ShapeGraphicsItemPropertiesWidget::associatedUndo() const
 			if (m_layer_cb)
 			{
 				const QString new_layer = m_layer_cb->currentData().toString();
+				Diagram*	  d			= nullptr;
+				for (QPointer<QetShapeItem> qsi : m_shapes_list)
+				{
+					if (qsi && qsi->diagram())
+					{
+						d = qsi->diagram();
+						break;
+					}
+				}
+				if (d && d->project() && ! new_layer.isEmpty())
+				{
+					d->project()->ensureDrawingLayer(new_layer);
+				}
 				for (QPointer<QetShapeItem> qsi : m_shapes_list)
 				{
 					if (qsi && qsi->layer() != new_layer)
@@ -537,6 +556,12 @@ QUndoCommand* ShapeGraphicsItemPropertiesWidget::associatedUndo() const
 			const QString new_layer = m_layer_cb->currentData().toString();
 			if (new_layer != m_shape->layer())
 			{
+				if (m_shape->diagram() && m_shape->diagram()->project()
+					&& ! new_layer.isEmpty())
+				{
+					m_shape->diagram()->project()->ensureDrawingLayer(
+						new_layer);
+				}
 				new QPropertyUndoCommand(
 					m_shape,
 					"layer",
@@ -701,23 +726,20 @@ void ShapeGraphicsItemPropertiesWidget::updateUi()
 		m_layer_cb->blockSignals(true);
 		m_layer_cb->clear();
 		m_layer_cb->addItem(tr("<None>"), QString());
-		Diagram* d = m_shape ?
-						 m_shape->diagram() :
-						 (! m_shapes_list.isEmpty() && m_shapes_list.first() ?
-							  m_shapes_list.first()->diagram() :
-							  nullptr);
-		if (d && d->project())
+		Diagram*		   d = m_shape ?
+								   m_shape->diagram() :
+								   (! m_shapes_list.isEmpty() && m_shapes_list.first() ?
+										m_shapes_list.first()->diagram() :
+										nullptr);
+		DrawingLayers::Set dlayers;
+		if (d && d->project()) { dlayers = d->project()->drawingLayers(); }
+		for (const auto& pair : DrawingLayers::availableLayerChoices(dlayers))
 		{
-			const auto& dlayers = d->project()->drawingLayers();
-			for (const QString& name : dlayers.names())
-			{
-				if (DrawingLayers::isFixed(name)) continue;
-				const QString desc = dlayers.description(name);
-				const QString label =
-					desc.isEmpty() ? name :
-									 QStringLiteral("%1 - %2").arg(name, desc);
-				m_layer_cb->addItem(label, name);
-			}
+			const QString label =
+				pair.second.isEmpty() ?
+					pair.first :
+					QStringLiteral("%1 - %2").arg(pair.first, pair.second);
+			m_layer_cb->addItem(label, pair.first);
 		}
 		const QString cur_layer =
 			m_shape ? m_shape->layer() :
@@ -726,6 +748,8 @@ void ShapeGraphicsItemPropertiesWidget::updateUi()
 						   QString());
 		const int idx = m_layer_cb->findData(cur_layer);
 		if (idx >= 0) m_layer_cb->setCurrentIndex(idx);
+		else
+			m_layer_cb->setCurrentIndex(0);
 		m_layer_cb->blockSignals(false);
 	}
 

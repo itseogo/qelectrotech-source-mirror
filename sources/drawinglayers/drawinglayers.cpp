@@ -32,8 +32,67 @@ namespace DrawingLayers
 {
 	namespace
 	{
-		const int LayerKey		 = 0x4c4159; // "LAY"
-		const int LayerHiddenKey = 0x4c4148; // "LAH"
+		const int LayerKey			= 0x4c4159; // "LAY"
+		const int LayerHiddenKey	= 0x4c4148; // "LAH"
+		const int LayerOrigColorKey = 0x4c4143; // "LAC"
+
+		void applyColor(QGraphicsItem* item, const QColor& layer_color)
+		{
+			if (! item) return;
+
+			if (auto* shape = dynamic_cast<QetShapeItem*>(item))
+			{
+				if (layer_color.isValid())
+				{
+					if (! item->data(LayerOrigColorKey).isValid())
+					{
+						item->setData(LayerOrigColorKey, shape->pen().color());
+					}
+					QPen p = shape->pen();
+					if (p.color() != layer_color)
+					{
+						p.setColor(layer_color);
+						shape->setPen(p);
+					}
+				}
+				else if (item->data(LayerOrigColorKey).isValid())
+				{
+					const QColor orig =
+						item->data(LayerOrigColorKey).value<QColor>();
+					item->setData(LayerOrigColorKey, QVariant());
+					QPen p = shape->pen();
+					if (p.color() != orig)
+					{
+						p.setColor(orig);
+						shape->setPen(p);
+					}
+				}
+			}
+			else if (auto* text_item = dynamic_cast<DiagramTextItem*>(item))
+			{
+				if (layer_color.isValid())
+				{
+					if (! item->data(LayerOrigColorKey).isValid())
+					{
+						item->setData(LayerOrigColorKey, text_item->color());
+					}
+					if (text_item->color() != layer_color)
+					{
+						text_item->setColor(layer_color);
+					}
+				}
+				else if (item->data(LayerOrigColorKey).isValid())
+				{
+					const QColor orig =
+						item->data(LayerOrigColorKey).value<QColor>();
+					item->setData(LayerOrigColorKey, QVariant());
+					if (text_item->color() != orig)
+					{
+						text_item->setColor(orig);
+					}
+				}
+			}
+		}
 
 		void applyFixedKindItem(
 			QGraphicsItem* item, bool show, ShownKinds::Kind kind)
@@ -66,12 +125,10 @@ namespace DrawingLayers
 	{
 		switch (kind)
 		{
-		case FixedKind::FrameAndTitleBlock:
-			return QStringLiteral("Frame and title block");
-		case FixedKind::WireNumbers: return QStringLiteral("Wire numbers");
-		case FixedKind::SymbolTexts: return QStringLiteral("Symbol texts");
-		case FixedKind::CrossReferences:
-			return QStringLiteral("Cross-references");
+		case FixedKind::FrameAndTitleBlock: return QStringLiteral("10");
+		case FixedKind::WireNumbers: return QStringLiteral("20");
+		case FixedKind::SymbolTexts: return QStringLiteral("30");
+		case FixedKind::CrossReferences: return QStringLiteral("40");
 		default: return QString();
 		}
 	}
@@ -118,16 +175,20 @@ namespace DrawingLayers
 
 	FixedKind fixedKindOf(const QString& name)
 	{
-		if (name == fixedKindName(FixedKind::FrameAndTitleBlock)
+		if (name == QStringLiteral("10")
+			|| name == QStringLiteral("Frame and title block")
 			|| name == fixedKindDisplayName(FixedKind::FrameAndTitleBlock))
 			return FixedKind::FrameAndTitleBlock;
-		if (name == fixedKindName(FixedKind::WireNumbers)
+		if (name == QStringLiteral("20")
+			|| name == QStringLiteral("Wire numbers")
 			|| name == fixedKindDisplayName(FixedKind::WireNumbers))
 			return FixedKind::WireNumbers;
-		if (name == fixedKindName(FixedKind::SymbolTexts)
+		if (name == QStringLiteral("30")
+			|| name == QStringLiteral("Symbol texts")
 			|| name == fixedKindDisplayName(FixedKind::SymbolTexts))
 			return FixedKind::SymbolTexts;
-		if (name == fixedKindName(FixedKind::CrossReferences)
+		if (name == QStringLiteral("40")
+			|| name == QStringLiteral("Cross-references")
 			|| name == fixedKindDisplayName(FixedKind::CrossReferences))
 			return FixedKind::CrossReferences;
 		return FixedKind::None;
@@ -142,25 +203,25 @@ namespace DrawingLayers
 	{
 		return {
 			{fixedKindName(FixedKind::FrameAndTitleBlock),
-			 QString(),
+			 fixedKindDisplayName(FixedKind::FrameAndTitleBlock),
 			 true,
 			 true,
 			 false,
 			 FixedKind::FrameAndTitleBlock},
 			{fixedKindName(FixedKind::WireNumbers),
-			 QString(),
+			 fixedKindDisplayName(FixedKind::WireNumbers),
 			 true,
 			 true,
 			 false,
 			 FixedKind::WireNumbers},
 			{fixedKindName(FixedKind::SymbolTexts),
-			 QString(),
+			 fixedKindDisplayName(FixedKind::SymbolTexts),
 			 true,
 			 true,
 			 false,
 			 FixedKind::SymbolTexts},
 			{fixedKindName(FixedKind::CrossReferences),
-			 QString(),
+			 fixedKindDisplayName(FixedKind::CrossReferences),
 			 true,
 			 true,
 			 false,
@@ -217,11 +278,56 @@ namespace DrawingLayers
 			if (layer.isFixed())
 			{
 				if (! layer.visible || ! layer.printable || layer.locked
-					|| ! layer.description.isEmpty())
+					|| layer.color.isValid()
+					|| (! layer.description.isEmpty()
+						&& layer.description
+							   != fixedKindDisplayName(layer.fixed_kind)))
 					return false;
 			}
 		}
 		return true;
+	}
+
+	QColor Set::color(FixedKind kind) const
+	{
+		if (kind == FixedKind::None) return QColor();
+		for (const Layer& layer : layers)
+		{
+			if (layer.fixed_kind == kind || layer.name == fixedKindName(kind))
+				return layer.color;
+		}
+		return QColor();
+	}
+
+	QColor Set::color(const QString& name) const
+	{
+		const FixedKind fk = fixedKindOf(name);
+		if (fk != FixedKind::None) return color(fk);
+		for (const Layer& layer : layers)
+		{
+			if (layer.name == name) return layer.color;
+		}
+		return QColor();
+	}
+
+	void Set::setColor(const QString& name, const QColor& color)
+	{
+		const FixedKind fk = fixedKindOf(name);
+		for (Layer& layer : layers)
+		{
+			if (layer.name == name
+				|| (fk != FixedKind::None && layer.fixed_kind == fk))
+			{
+				layer.color = color;
+				return;
+			}
+		}
+		if (fk == FixedKind::None)
+		{
+			Layer new_layer(name);
+			new_layer.color = color;
+			layers.append(new_layer);
+		}
 	}
 
 	bool Set::contains(const QString& name) const
@@ -301,6 +407,11 @@ namespace DrawingLayers
 				|| (fk != FixedKind::None && layer.fixed_kind == fk))
 				return layer.description;
 		}
+		if (fk != FixedKind::None) return fixedKindDisplayName(fk);
+		for (const Layer& preset : standardPresetLayers())
+		{
+			if (preset.name == name) return preset.description;
+		}
 		return QString();
 	}
 
@@ -359,6 +470,12 @@ namespace DrawingLayers
 					QStringLiteral("locked"),
 					QStringLiteral("true"));
 			}
+			if (layer.color.isValid())
+			{
+				element.setAttribute(
+					QStringLiteral("color"),
+					layer.color.name());
+			}
 			if (layer.isFixed())
 			{
 				element.setAttribute(
@@ -405,6 +522,10 @@ namespace DrawingLayers
 			const bool locked =
 				(e.attribute(QStringLiteral("locked"))
 				 == QLatin1String("true"));
+			const QColor color =
+				e.hasAttribute(QStringLiteral("color")) ?
+					QColor(e.attribute(QStringLiteral("color"))) :
+					QColor();
 
 			FixedKind fk = FixedKind::None;
 			if (e.hasAttribute(QStringLiteral("fixed")))
@@ -423,7 +544,10 @@ namespace DrawingLayers
 				if ((fk != FixedKind::None && l.fixed_kind == fk)
 					|| l.name == name)
 				{
-					l.description = desc;
+					l.description = desc.isEmpty() && fk != FixedKind::None ?
+										fixedKindDisplayName(fk) :
+										desc;
+					l.color		  = color;
 					l.visible	  = visible;
 					l.printable	  = printable;
 					l.locked	  = locked;
@@ -434,7 +558,8 @@ namespace DrawingLayers
 			}
 			if (! found)
 			{
-				set.layers.append({name, desc, visible, printable, locked, fk});
+				set.layers.append(
+					{name, desc, visible, printable, locked, fk, color});
 			}
 		}
 		set.groups.clear();
@@ -515,6 +640,9 @@ namespace DrawingLayers
 		item->setFlag(QGraphicsItem::ItemIsMovable, ! locked);
 		item->setFlag(QGraphicsItem::ItemIsSelectable, ! locked);
 		if (locked && item->isSelected()) { item->setSelected(false); }
+
+		const QColor layer_color = set.color(layer);
+		applyColor(item, layer_color);
 	}
 
 	void applyTo(Diagram* folio, const Set& set)
@@ -559,6 +687,7 @@ namespace DrawingLayers
 				item->setFlag(QGraphicsItem::ItemIsMovable, ! lock_wires);
 				item->setFlag(QGraphicsItem::ItemIsSelectable, ! lock_wires);
 				if (lock_wires && item->isSelected()) item->setSelected(false);
+				applyColor(item, set.color(FixedKind::WireNumbers));
 			}
 			else if (kind == ShownKinds::SymbolTexts)
 			{
@@ -567,6 +696,7 @@ namespace DrawingLayers
 				item->setFlag(QGraphicsItem::ItemIsSelectable, ! lock_symbols);
 				if (lock_symbols && item->isSelected())
 					item->setSelected(false);
+				applyColor(item, set.color(FixedKind::SymbolTexts));
 			}
 			else if (kind == ShownKinds::CrossReferences)
 			{
@@ -577,6 +707,7 @@ namespace DrawingLayers
 				item->setFlag(QGraphicsItem::ItemIsMovable, ! lock_xrefs);
 				item->setFlag(QGraphicsItem::ItemIsSelectable, ! lock_xrefs);
 				if (lock_xrefs && item->isSelected()) item->setSelected(false);
+				applyColor(item, set.color(FixedKind::CrossReferences));
 			}
 		}
 	}
@@ -657,7 +788,8 @@ namespace DrawingLayers
 	QString exportToCsv(const Set& set)
 	{
 		QString result;
-		result += QStringLiteral("Name,Description,Visible,Printable,Locked\n");
+		result +=
+			QStringLiteral("Name,Description,Visible,Printable,Locked,Color\n");
 		for (const Layer& layer : set.layers)
 		{
 			QStringList fields;
@@ -672,6 +804,7 @@ namespace DrawingLayers
 			fields
 				<< (layer.locked ? QStringLiteral("true") :
 								   QStringLiteral("false"));
+			fields << (layer.color.isValid() ? layer.color.name() : QString());
 			result += fields.join(QLatin1Char(',')) + QLatin1Char('\n');
 		}
 		return result;
@@ -693,8 +826,8 @@ namespace DrawingLayers
 		else if (first_line.contains(QLatin1Char(';')))
 			delimiter = QLatin1Char(';');
 
-		int name_col = -1, desc_col = -1, visible_col = -1, print_col = -1,
-			lock_col   = -1;
+		int name_col = -1, desc_col = -1, color_col = -1, visible_col = -1,
+			print_col = -1, lock_col = -1;
 		int start_line = 0;
 
 		const QStringList header_fields = parseCsvLine(first_line, delimiter);
@@ -713,6 +846,14 @@ namespace DrawingLayers
 					|| h.contains(QLatin1String("desc"))))
 			{
 				desc_col = i;
+			}
+			else if (
+				color_col < 0
+				&& (h.contains(QLatin1String("farb"))
+					|| h.contains(QLatin1String("color"))
+					|| h.contains(QLatin1String("colour"))))
+			{
+				color_col = i;
 			}
 			else if (
 				visible_col < 0
@@ -744,9 +885,10 @@ namespace DrawingLayers
 			// No recognized header row: assume default column order
 			name_col	= 0;
 			desc_col	= 1;
-			visible_col = 2;
-			print_col	= 3;
-			lock_col	= 4;
+			color_col	= 2;
+			visible_col = 3;
+			print_col	= 4;
+			lock_col	= 5;
 		}
 
 		int count = 0;
@@ -763,10 +905,23 @@ namespace DrawingLayers
 			const QString desc = (desc_col >= 0 && desc_col < fields.size()) ?
 									 fields.at(desc_col).trimmed() :
 									 QString();
-			const bool	  visible =
-				   (visible_col >= 0 && visible_col < fields.size()) ?
-					   parseBoolValue(fields.at(visible_col), true) :
-					   true;
+			QColor		  layer_color;
+			if (color_col >= 0 && color_col < fields.size())
+			{
+				const QString c_str = fields.at(color_col).trimmed();
+				if (! c_str.isEmpty() && c_str != QLatin1String("-5")
+					&& c_str != QLatin1String("0"))
+				{
+					if (c_str.startsWith(QLatin1Char('#')))
+						layer_color = QColor(c_str);
+					else if (QColor::isValidColorName(c_str))
+						layer_color = QColor(c_str);
+				}
+			}
+			const bool visible =
+				(visible_col >= 0 && visible_col < fields.size()) ?
+					parseBoolValue(fields.at(visible_col), true) :
+					true;
 			const bool printable =
 				(print_col >= 0 && print_col < fields.size()) ?
 					parseBoolValue(fields.at(print_col), true) :
@@ -783,6 +938,7 @@ namespace DrawingLayers
 					|| existing.name == name)
 				{
 					if (! desc.isEmpty()) existing.description = desc;
+					if (layer_color.isValid()) existing.color = layer_color;
 					existing.visible   = visible;
 					existing.printable = printable;
 					existing.locked	   = locked;
@@ -792,7 +948,8 @@ namespace DrawingLayers
 			}
 			if (! found)
 			{
-				set.layers.append({name, desc, visible, printable, locked, fk});
+				set.layers.append(
+					{name, desc, visible, printable, locked, fk, layer_color});
 			}
 			++count;
 		}
@@ -835,6 +992,8 @@ namespace DrawingLayers
 				{
 					if (! imported_layer.description.isEmpty())
 						existing.description = imported_layer.description;
+					if (imported_layer.color.isValid())
+						existing.color = imported_layer.color;
 					existing.visible   = imported_layer.visible;
 					existing.printable = imported_layer.printable;
 					existing.locked	   = imported_layer.locked;
@@ -970,5 +1129,44 @@ namespace DrawingLayers
 			}
 			if (! found) { set.groups.append(preset_group); }
 		}
+	}
+
+	bool ensureLayer(Set& set, const QString& name)
+	{
+		if (name.isEmpty() || set.contains(name)) return false;
+		for (const Layer& preset : standardPresetLayers())
+		{
+			if (preset.name == name)
+			{
+				set.layers.append(preset);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	QList<QPair<QString, QString>> availableLayerChoices(const Set& set)
+	{
+		QList<QPair<QString, QString>> list;
+		QSet<QString>				   seen;
+
+		// 1. User layers from set
+		for (const Layer& layer : set.userLayers())
+		{
+			seen.insert(layer.name);
+			list.append({layer.name, layer.description});
+		}
+
+		// 2. Standard presets
+		for (const Layer& preset : standardPresetLayers())
+		{
+			if (! seen.contains(preset.name))
+			{
+				seen.insert(preset.name);
+				list.append({preset.name, preset.description});
+			}
+		}
+
+		return list;
 	}
 } // namespace DrawingLayers

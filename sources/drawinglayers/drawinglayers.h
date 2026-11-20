@@ -18,8 +18,10 @@
 #ifndef DRAWINGLAYERS_H
 #define DRAWINGLAYERS_H
 
+#include <QColor>
 #include <QDomElement>
 #include <QList>
+#include <QPair>
 #include <QString>
 #include <QStringList>
 
@@ -63,14 +65,19 @@ namespace DrawingLayers
 	{
 		QString	  name;
 		QString	  description;
+		QColor	  color;
 		bool	  visible	 = true;
 		bool	  printable	 = true;
 		bool	  locked	 = false;
 		FixedKind fixed_kind = FixedKind::None;
 
 		Layer() = default;
-		Layer(const QString& n, bool v = true, FixedKind fk = FixedKind::None) :
-			name(n), visible(v), fixed_kind(fk)
+		Layer(
+			const QString& n,
+			bool		   v  = true,
+			FixedKind	   fk = FixedKind::None,
+			const QColor&  c  = QColor()) :
+			name(n), color(c), visible(v), fixed_kind(fk)
 		{
 		}
 		Layer(
@@ -79,9 +86,11 @@ namespace DrawingLayers
 			bool		   v  = true,
 			bool		   p  = true,
 			bool		   l  = false,
-			FixedKind	   fk = FixedKind::None) :
+			FixedKind	   fk = FixedKind::None,
+			const QColor&  c  = QColor()) :
 			name(n),
 			description(d),
+			color(c),
 			visible(v),
 			printable(p),
 			locked(l),
@@ -93,8 +102,9 @@ namespace DrawingLayers
 		bool operator==(const Layer& o) const
 		{
 			return name == o.name && description == o.description
-				   && visible == o.visible && printable == o.printable
-				   && locked == o.locked && fixed_kind == o.fixed_kind;
+				   && color == o.color && visible == o.visible
+				   && printable == o.printable && locked == o.locked
+				   && fixed_kind == o.fixed_kind;
 		}
 	};
 
@@ -133,6 +143,9 @@ namespace DrawingLayers
 		bool		isPrintable(FixedKind kind) const;
 		bool		isLocked(const QString& name) const;
 		bool		isLocked(FixedKind kind) const;
+		QColor		color(const QString& name) const;
+		QColor		color(FixedKind kind) const;
+		void		setColor(const QString& name, const QColor& color);
 		QString		description(const QString& name) const;
 		QStringList names() const;
 		Set			showing(const Group& group) const;
@@ -159,9 +172,11 @@ namespace DrawingLayers
 	bool	   importFromXml(
 			  Set& set, const QByteArray& xml_content, int* imported_count = nullptr);
 
-	QList<Layer> standardPresetLayers();
-	QList<Group> standardPresetGroups();
-	void		 loadStandardPresets(Set& set);
+	QList<Layer>				   standardPresetLayers();
+	QList<Group>				   standardPresetGroups();
+	void						   loadStandardPresets(Set& set);
+	bool						   ensureLayer(Set& set, const QString& name);
+	QList<QPair<QString, QString>> availableLayerChoices(const Set& set);
 } // namespace DrawingLayers
 
 #endif // DRAWINGLAYERS_H
