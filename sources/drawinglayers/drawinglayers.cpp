@@ -195,9 +195,7 @@ namespace DrawingLayers
 	}
 
 	bool isFixed(const QString& name)
-	{
-		return fixedKindOf(name) != FixedKind::None;
-	}
+	{ return fixedKindOf(name) != FixedKind::None; }
 
 	QList<Layer> defaultFixedLayers()
 	{
@@ -580,9 +578,7 @@ namespace DrawingLayers
 	}
 
 	QString layerOf(const QGraphicsItem* item)
-	{
-		return item ? item->data(LayerKey).toString() : QString();
-	}
+	{ return item ? item->data(LayerKey).toString() : QString(); }
 
 	void setLayerOf(QGraphicsItem* item, const QString& layer)
 	{
@@ -598,9 +594,7 @@ namespace DrawingLayers
 	}
 
 	void readAttribute(QGraphicsItem* item, const QDomElement& element)
-	{
-		setLayerOf(item, element.attribute(QStringLiteral("layer")));
-	}
+	{ setLayerOf(item, element.attribute(QStringLiteral("layer"))); }
 
 	bool canBeOnLayer(const QGraphicsItem* item)
 	{

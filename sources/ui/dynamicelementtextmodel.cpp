@@ -548,9 +548,7 @@ DynamicElementTextModel::itemsForText(DynamicElementTextItem* deti)
 	@param deti
 */
 void DynamicElementTextModel::addText(DynamicElementTextItem* deti)
-{
-	this->appendRow(itemsForText(deti));
-}
+{ this->appendRow(itemsForText(deti)); }
 
 /**
 	@brief DynamicElementTextModel::removeText

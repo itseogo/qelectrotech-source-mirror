@@ -115,9 +115,7 @@ namespace DrawingLayers
 		QString		name;
 		QStringList layers;
 		bool		operator==(const Group& o) const
-		{
-			return name == o.name && layers == o.layers;
-		}
+		{ return name == o.name && layers == o.layers; }
 	};
 
 	struct Set
@@ -132,9 +130,7 @@ namespace DrawingLayers
 
 		bool isEmpty() const;
 		bool operator==(const Set& o) const
-		{
-			return layers == o.layers && groups == o.groups;
-		}
+		{ return layers == o.layers && groups == o.groups; }
 		bool		operator!=(const Set& o) const { return ! (*this == o); }
 		bool		contains(const QString& name) const;
 		bool		isVisible(const QString& name) const;
@@ -167,10 +163,10 @@ namespace DrawingLayers
 
 	QString exportToCsv(const Set& set);
 	bool	importFromCsv(
-		   Set& set, const QString& csv_content, int* imported_count = nullptr);
+		Set& set, const QString& csv_content, int* imported_count = nullptr);
 	QByteArray exportToXml(const Set& set);
 	bool	   importFromXml(
-			  Set& set, const QByteArray& xml_content, int* imported_count = nullptr);
+		Set& set, const QByteArray& xml_content, int* imported_count = nullptr);
 
 	QList<Layer>				   standardPresetLayers();
 	QList<Group>				   standardPresetGroups();
