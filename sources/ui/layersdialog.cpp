@@ -50,19 +50,24 @@ namespace
 {
 	void paintColorButton(QPushButton* button, const QColor& color)
 	{
+		const QString obj = button->objectName().isEmpty() ?
+			QStringLiteral("layerColorBtn") :
+			button->objectName();
+		if (button->objectName().isEmpty()) button->setObjectName(obj);
+
 		if (color.isValid())
 		{
 			const QString hex = color.name().toUpper();
 			const double  lum = 0.299 * color.red() + 0.587 * color.green()
-							   + 0.114 * color.blue();
+								+ 0.114 * color.blue();
 			const QString text_color = lum > 140 ? QStringLiteral("#000000") :
 												   QStringLiteral("#FFFFFF");
 			button->setStyleSheet(
 				QStringLiteral(
-					"QPushButton { background-color: %1; color: %2; "
+					"#%1 { background-color: %2; color: %3; "
 					"font-weight: bold; border: 1px solid #555555; "
 					"border-radius: 2px; padding: 2px 6px; }")
-					.arg(hex, text_color));
+					.arg(obj, hex, text_color));
 			button->setIcon(QIcon());
 			button->setText(hex);
 			button->setToolTip(
@@ -72,9 +77,10 @@ namespace
 		else
 		{
 			button->setStyleSheet(QStringLiteral(
-				"QPushButton { background-color: #000000; color: #FFFFFF; "
+				"#%1 { background-color: #000000; color: #FFFFFF; "
 				"font-weight: bold; border: 1px solid #333333; border-radius: "
-				"2px; padding: 2px 6px; }"));
+				"2px; padding: 2px 6px; }")
+				.arg(obj));
 			button->setIcon(QIcon());
 			button->setText(QObject::tr("Default"));
 			button->setToolTip(
@@ -308,7 +314,7 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 			if (! name_item) return;
 			const QVariant data = name_item->data(Qt::UserRole);
 			const QString  layer_name =
-				 data.isValid() ? data.toString() : name_item->text();
+				data.isValid() ? data.toString() : name_item->text();
 
 			if (item->column() == 1)
 			{
@@ -419,11 +425,11 @@ void LayersDialog::updateButtonStates()
 	const QString current		= currentLayer();
 	const bool	  has_selection = ! current.isEmpty();
 	const bool	  fixed			= DrawingLayers::isFixed(current);
-	const bool	  can_put		= has_selection
-						 && (! fixed
-							 || current
-									== DrawingLayers::fixedKindName(
-										DrawingLayers::FixedKind::Graphics));
+	const bool	  can_put = has_selection
+							&& (! fixed
+								|| current
+									   == DrawingLayers::fixedKindName(
+										   DrawingLayers::FixedKind::Graphics));
 
 	if (m_rename_btn) m_rename_btn->setEnabled(has_selection && ! fixed);
 	if (m_remove_btn) m_remove_btn->setEnabled(has_selection && ! fixed);
@@ -445,7 +451,7 @@ void LayersDialog::filterLayers(const QString& filter_text)
 		const QString name		= name_item ? name_item->text() : QString();
 		const QString desc		= desc_item ? desc_item->text() : QString();
 		const bool	  match		= name.contains(text, Qt::CaseInsensitive)
-						   || desc.contains(text, Qt::CaseInsensitive);
+								  || desc.contains(text, Qt::CaseInsensitive);
 		m_layers->setRowHidden(row, ! match);
 	}
 }
@@ -691,13 +697,13 @@ void LayersDialog::setLayerColor(const QString& name, const QColor& color)
 		m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
 }
 
-void LayersDialog::chooseLayerColor(const QString& name, QWidget* button)
+void LayersDialog::chooseLayerColor(const QString& name, QWidget* /*button*/)
 {
 	if (! m_project) return;
 	const QColor current_color = m_project->drawingLayers().color(name);
 	const QColor chosen		   = QColorDialog::getColor(
-		   current_color.isValid() ? current_color : Qt::black,
-		button ? button : this,
+		current_color.isValid() ? current_color : Qt::black,
+		this,
 		tr("Choose layer color"),
 		QColorDialog::ShowAlphaChannel);
 	if (chosen.isValid()) { setLayerColor(name, chosen); }
