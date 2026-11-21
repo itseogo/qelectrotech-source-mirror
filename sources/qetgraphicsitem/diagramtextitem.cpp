@@ -19,6 +19,7 @@
 
 #include <diagram.h>
 #include <diagramcommands.h>
+#include <drawinglayers/drawinglayers.h>
 #include "dynamicelementtextitem.h"
 #include <qetproject.h>
 #include <qetapp.h>
@@ -507,7 +508,9 @@ void DiagramTextItem::focusOutEvent(QFocusEvent *event)
 		//Bad hack to be re-entrant
 	setTextInteractionFlags(Qt::NoTextInteraction);
 
-	setFlag(QGraphicsItem::ItemIsMovable, true);
+	const bool locked = DrawingLayers::isLocked(this);
+	setFlag(QGraphicsItem::ItemIsMovable, ! locked);
+	setFlag(QGraphicsItem::ItemIsSelectable, ! locked);
 	setFlag(QGraphicsTextItem::ItemIsFocusable, false);
 	refreshTextResizeHandles();
 }
@@ -599,6 +602,10 @@ void DiagramTextItem::pushResizeCommand(qreal old_width, qreal new_width,
 	@param event un QGraphicsSceneMouseEvent decrivant le double-clic
 */
 void DiagramTextItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event) {
+	if (DrawingLayers::isLocked(this)) {
+		event->ignore();
+		return;
+	}
 	if (!(textInteractionFlags() & Qt::TextEditable) && !m_no_editable) {
 		// rend le champ de texte editable
 		setTextInteractionFlags(Qt::TextEditorInteraction);
@@ -616,6 +623,11 @@ void DiagramTextItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event) {
 */
 void DiagramTextItem::mousePressEvent (QGraphicsSceneMouseEvent *event)
 {
+	if (DrawingLayers::isLocked(this))
+	{
+		event->ignore();
+		return;
+	}
 	if (event->button() == Qt::LeftButton)
 	{
 		m_first_move = true;

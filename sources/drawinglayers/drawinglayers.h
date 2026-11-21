@@ -160,6 +160,7 @@ namespace DrawingLayers
 
 	bool canBeOnLayer(const QGraphicsItem* item);
 	bool isHidden(const QGraphicsItem* item);
+	bool isLocked(const QGraphicsItem* item);
 	void apply(QGraphicsItem* item, const Set& set);
 	void applyTo(Diagram* folio, const Set& set);
 

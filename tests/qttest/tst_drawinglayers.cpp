@@ -882,6 +882,31 @@ class tst_drawinglayers : public QObject
 		QCOMPARE(new_image.layer(), QStringLiteral("50"));
 		project.undoStack()->undo();
 		QCOMPARE(new_image.layer(), QStringLiteral("60"));
+
+		// Locked layer prevents text editing and movement
+		IndependentTextItem locked_text;
+		folio->addItem(&locked_text);
+		QCOMPARE(locked_text.layer(), QStringLiteral("50"));
+		QVERIFY(! DrawingLayers::isLocked(&locked_text));
+
+		DrawingLayers::Set locked_set = project.drawingLayers();
+		for (auto& l : locked_set.layers)
+		{
+			if (l.name == QStringLiteral("50"))
+			{
+				l.locked = true;
+				break;
+			}
+		}
+		project.setDrawingLayers(locked_set);
+		QVERIFY(DrawingLayers::isLocked(&locked_text));
+		QVERIFY(! (locked_text.flags() & QGraphicsItem::ItemIsMovable));
+		QVERIFY(! (locked_text.flags() & QGraphicsItem::ItemIsSelectable));
+
+		// Simulated focusOut does not restore movability on locked item
+		QFocusEvent focus_out(QEvent::FocusOut);
+		QApplication::sendEvent(&locked_text, &focus_out);
+		QVERIFY(! (locked_text.flags() & QGraphicsItem::ItemIsMovable));
 	}
 };
 

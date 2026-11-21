@@ -18,6 +18,7 @@
 #include "qetgraphicsitem.h"
 
 #include <diagram.h>
+#include <drawinglayers/drawinglayers.h>
 #include "element.h"
 #include <diagramevent/diagrameventaddpaste.h>
 
@@ -128,6 +129,12 @@ void QetGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 		}
 	}
 
+	if (DrawingLayers::isLocked(this))
+	{
+		event->ignore();
+		return;
+	}
+
 	QGraphicsItem::mousePressEvent(event);
 }
 
@@ -138,6 +145,11 @@ void QetGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 */
 void QetGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 {
+	if (DrawingLayers::isLocked(this))
+	{
+		event->ignore();
+		return;
+	}
 	editProperty();
 	event->accept();
 }

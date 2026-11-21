@@ -23,6 +23,7 @@
 #include "../qetgraphicsitem/independenttextitem.h"
 #include "../qetgraphicsitem/qetshapeitem.h"
 #include "../qetgraphicsitem/structureboxitem.h"
+#include "../qetproject.h"
 #include "../shownkinds.h"
 
 #include <QGraphicsItem>
@@ -646,6 +647,34 @@ namespace DrawingLayers
 		{
 			if (! layerOf(p).isEmpty() && ! p->isVisible()) return true;
 			if (p->data(LayerHiddenKey).toBool()) return true;
+		}
+		return false;
+	}
+
+	bool isLocked(const QGraphicsItem* item)
+	{
+		if (! item) return false;
+		const Diagram* d = nullptr;
+		if (auto* scene = item->scene())
+		{
+			d = qobject_cast<const Diagram*>(scene);
+		}
+		if (! d || ! d->project()) return false;
+		const Set& set = d->project()->drawingLayers();
+
+		for (const QGraphicsItem* p = item; p; p = p->parentItem())
+		{
+			const QString layer = layerOf(p);
+			if (! layer.isEmpty()) return set.isLocked(layer);
+		}
+
+		const QVariant val = item->data(ShownKinds::data_key);
+		if (val.isValid())
+		{
+			const int kind = val.toInt();
+			if (kind == ShownKinds::WireNumbers) return set.isLocked(FixedKind::WireNumbers);
+			if (kind == ShownKinds::SymbolTexts) return set.isLocked(FixedKind::SymbolTexts);
+			if (kind == ShownKinds::CrossReferences) return set.isLocked(FixedKind::CrossReferences);
 		}
 		return false;
 	}

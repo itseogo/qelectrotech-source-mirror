@@ -675,6 +675,11 @@ void DiagramImageItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 */
 void DiagramImageItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 {
+	if (DrawingLayers::isLocked(this))
+	{
+		event->ignore();
+		return;
+	}
 	if (event->button() != Qt::LeftButton)
 	{
 		QetGraphicsItem::mouseDoubleClickEvent(event);
