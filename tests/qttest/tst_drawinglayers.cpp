@@ -18,6 +18,7 @@
 #include "dataBase/projectdatabase.h"
 #include "diagram.h"
 #include "drawinglayers/drawinglayers.h"
+#include "dxfexport.h"
 #include "print/projectprintwindow.h"
 #include "qetapptest.h"
 #include "qetgraphicsitem/conductortextitem.h"
@@ -907,6 +908,39 @@ class tst_drawinglayers : public QObject
 		QFocusEvent focus_out(QEvent::FocusOut);
 		QApplication::sendEvent(&locked_text, &focus_out);
 		QVERIFY(! (locked_text.flags() & QGraphicsItem::ItemIsMovable));
+
+		// DXF export includes drawing layers and applies layer to exported entities
+		{
+			QTemporaryDir tmp_dir;
+			const QString  dxf_path = tmp_dir.filePath(QStringLiteral("test_export.dxf"));
+			ExportProperties props;
+			props.dxf_blocks = false;
+			props.dxf_attributes = false;
+			props.draw_border = true;
+
+			// Add a custom shape with layer "50"
+			QetShapeItem shape(QPointF(10, 10), QPointF(50, 50), QetShapeItem::Rectangle);
+			DrawingLayers::setLayerOf(&shape, QStringLiteral("50"));
+			folio->addItem(&shape);
+
+			DxfExport::write(folio, 1000, 1000, dxf_path, props);
+			QFile dxf_file(dxf_path);
+			QVERIFY(dxf_file.open(QIODevice::ReadOnly));
+			const QString dxf_content = QString::fromUtf8(dxf_file.readAll());
+
+			// Verify DXF layer table contains DrawingLayer names
+			DrawingLayers::Layer l50;
+			l50.name = QStringLiteral("50");
+			l50.description = QStringLiteral("Graphics");
+			const QString layer50_dxf_name = DrawingLayers::dxfLayerName(l50);
+			QVERIFY(dxf_content.contains(layer50_dxf_name));
+
+			DrawingLayers::Layer l10;
+			l10.name = QStringLiteral("10");
+			l10.description = QStringLiteral("Frame and title block");
+			const QString layer10_dxf_name = DrawingLayers::dxfLayerName(l10);
+			QVERIFY(dxf_content.contains(layer10_dxf_name));
+		}
 	}
 };
 

@@ -1216,4 +1216,16 @@ namespace DrawingLayers
 
 		return list;
 	}
+
+	QString dxfLayerName(const Layer& layer)
+	{
+		QString name = layer.name.trimmed();
+		if (! layer.description.trimmed().isEmpty())
+		{
+			name += QStringLiteral(" - ") + layer.description.trimmed();
+		}
+		static const QRegularExpression invalidChars(QStringLiteral(R"([<>/\":;?*|=])"));
+		name.replace(invalidChars, QStringLiteral("_"));
+		return name.isEmpty() ? QStringLiteral("0") : name;
+	}
 } // namespace DrawingLayers

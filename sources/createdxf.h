@@ -33,7 +33,17 @@ class Createdxf
 	public:
 		Createdxf();
 		~Createdxf();
+
+		struct LayerDef
+		{
+			QString name;
+			int color = 7;
+			int flags = 0;
+		};
+
 		static void dxfBegin (const QString&, const QStringList &layers = QStringList(),
+				      const std::function<void()> &writeBlocks = {});
+		static void dxfBegin (const QString&, const QList<LayerDef> &layers,
 				      const std::function<void()> &writeBlocks = {});
 		static void dxfEnd(const QString&);
 		static void dxfBlockBegin(const QString &fileName,

@@ -22,6 +22,7 @@
 #include "conductorsegment.h"
 #include "createdxf.h"
 #include "diagram.h"
+#include "qetproject.h"
 #include "dxfpaintdevice.h"
 #include "exportproperties.h"
 #include "factory/elementpicturefactory.h"
@@ -318,6 +319,65 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 	QString file_path = path;
 	const ExportProperties previous = diagram -> applyProperties(properties);
 
+	const DrawingLayers::Set dlayers = diagram && diagram->project()
+			? diagram->project()->drawingLayers()
+			: DrawingLayers::Set();
+
+	auto findLayerByName = [&](const QString& name) -> const DrawingLayers::Layer* {
+		for (const auto& l : dlayers.layers) {
+			if (l.name == name) return &l;
+		}
+		return nullptr;
+	};
+
+	auto findLayerByKind = [&](DrawingLayers::FixedKind kind) -> const DrawingLayers::Layer* {
+		for (const auto& l : dlayers.layers) {
+			if (l.fixed_kind == kind) return &l;
+		}
+		return nullptr;
+	};
+
+	auto dxfLayerForKind = [&](DrawingLayers::FixedKind kind, const QString& fallback) -> QString {
+		if (const auto* l = findLayerByKind(kind)) {
+			return DrawingLayers::dxfLayerName(*l);
+		}
+		return fallback;
+	};
+
+	auto dxfLayerForItem = [&](const QGraphicsItem* item, const QString& default_layer_name, const QString& fallback) -> QString {
+		QString l_name = DrawingLayers::layerOf(item);
+		if (l_name.isEmpty()) {
+			l_name = default_layer_name;
+		}
+		if (!l_name.isEmpty()) {
+			if (const auto* l = findLayerByName(l_name)) {
+				return DrawingLayers::dxfLayerName(*l);
+			}
+			return l_name;
+		}
+		return fallback;
+	};
+
+	auto layerColorForItem = [&](const QGraphicsItem* item, const QString& default_layer_name) -> QColor {
+		QString l_name = DrawingLayers::layerOf(item);
+		if (l_name.isEmpty()) {
+			l_name = default_layer_name;
+		}
+		if (!l_name.isEmpty()) {
+			if (const auto* l = findLayerByName(l_name)) {
+				if (l->color.isValid()) return l->color;
+			}
+		}
+		return QColor();
+	};
+
+	auto layerColorForKind = [&](DrawingLayers::FixedKind kind) -> QColor {
+		if (const auto* l = findLayerByKind(kind)) {
+			if (l->color.isValid()) return l->color;
+		}
+		return QColor();
+	};
+
 	width  -= 2*Diagram::margin;
 	height -= 2*Diagram::margin;
 
@@ -500,7 +560,16 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 				attribute.rotation = 360 - line.angle;
 				attribute.xScaleW = 0.72;
 				attribute.colour = Createdxf::dxfColor(dti -> color());
-				attribute.layer = Layer::SymbolTexts;
+				const QString dti_layer = DrawingLayers::layerOf(dti);
+				if (!dti_layer.isEmpty()) {
+					attribute.layer = dxfLayerForItem(dti, QString(), Layer::SymbolTexts);
+					const QColor l_col = layerColorForItem(dti, QString());
+					if (l_col.isValid()) attribute.colour = Createdxf::dxfColor(l_col);
+				} else {
+					attribute.layer = dxfLayerForKind(DrawingLayers::FixedKind::SymbolTexts, Layer::SymbolTexts);
+					const QColor l_col = layerColorForKind(DrawingLayers::FixedKind::SymbolTexts);
+					if (l_col.isValid()) attribute.colour = Createdxf::dxfColor(l_col);
+				}
 				attributes[elmt] << attribute;
 
 				if (!defined_tags[block].contains(tag)) {
@@ -546,7 +615,7 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 				attribute.y = insert.y();
 				attribute.height = 9 * Createdxf::yScale;
 				attribute.invisible = true;
-				attribute.layer = Layer::SymbolTexts;
+				attribute.layer = dxfLayerForKind(DrawingLayers::FixedKind::SymbolTexts, Layer::SymbolTexts);
 				attributes[elmt] << attribute;
 
 				if (!defined_tags[block].contains(tag)) {
@@ -561,9 +630,25 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 		}
 	}
 
+		// Prepare all DXF layer definitions (project drawing layers + fallback standard layers)
+	QList<Createdxf::LayerDef> dxf_layer_defs;
+	for (const auto &l : dlayers.layers) {
+		Createdxf::LayerDef def;
+		def.name = DrawingLayers::dxfLayerName(l);
+		int col = l.color.isValid() ? Createdxf::dxfColor(l.color) : 7;
+		if (col == 0) col = 7;
+		if (!l.visible) col = -std::abs(col);
+		def.color = col;
+		def.flags = l.locked ? 4 : 0;
+		dxf_layer_defs.append(def);
+	}
+	for (const QString &fixed_layer : Layer::all()) {
+		dxf_layer_defs.append({fixed_layer, 7, 0});
+	}
+
 		//A block is drawn as if its symbol sat unturned at the folio's
 		//origin, which is DXF (0, sheetHeight); that is its base point.
-	Createdxf::dxfBegin(file_path, Layer::all(), [&]() {
+	Createdxf::dxfBegin(file_path, dxf_layer_defs, [&]() {
 		for (Element *model : std::as_const(block_models)) {
 			const QString block = block_names.value(model -> location().toString());
 			const QList<Createdxf::Attribute> definitions = attribute_definitions.value(block);
@@ -577,25 +662,34 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 	});
 
 		//Each kind of content on its own layer (discussion #1071). The
-		//border's title block switches to Layer::TitleBlock itself, see
+		//border's title block switches to its drawing layer itself, see
 		//BorderTitleBlock::drawDxf().
-	Createdxf::layer = Layer::Border;
+	Createdxf::layer = dxfLayerForKind(DrawingLayers::FixedKind::FrameAndTitleBlock, Layer::Border);
+	const QColor border_layer_col = layerColorForKind(DrawingLayers::FixedKind::FrameAndTitleBlock);
+	const int border_color_code = border_layer_col.isValid() ? Createdxf::dxfColor(border_layer_col) : 0;
 	//Add project elements (lines, rectangles, circles, texts) to dxf file
 	if (properties.draw_border) {
 		QRectF rect(Diagram::margin,Diagram::margin,width,height);
-		Createdxf::drawRectangle(file_path,rect,0);
+		Createdxf::drawRectangle(file_path,rect,border_color_code);
 	}
 	if (diagram->useBorder()) {
-		diagram -> border_and_titleblock.drawDxf(file_path, 0);
+		diagram -> border_and_titleblock.drawDxf(file_path, border_color_code);
 	}
 
 	// Draw shapes
-	Createdxf::layer = Layer::Shapes;
-	foreach (QetShapeItem *qsi, list_shapes) qsi->toDXF(file_path, qsi->pen());
+	foreach (QetShapeItem *qsi, list_shapes) {
+		Createdxf::layer = dxfLayerForItem(qsi, QStringLiteral("50"), Layer::Shapes);
+		QPen pen = qsi->pen();
+		const QColor l_col = layerColorForItem(qsi, QStringLiteral("50"));
+		if (l_col.isValid()) {
+			pen.setColor(l_col);
+		}
+		qsi->toDXF(file_path, pen);
+	}
 
 	// Draw tables
-	Createdxf::layer = Layer::Tables;
 	foreach (QetGraphicsTableItem *gti, list_tables) {
+		Createdxf::layer = dxfLayerForItem(gti, QString(), Layer::Tables);
 		gti->toDXF(file_path);
 	}
 
@@ -642,7 +736,9 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 		const ConductorProperties wire_properties = cond -> properties();
 		Createdxf::drawPolyline(file_path, poly, Createdxf::dxfColor(wire_properties.color));
 		//Draw conductor text item
-		Createdxf::layer = Layer::WireNumbers;
+		Createdxf::layer = dxfLayerForKind(DrawingLayers::FixedKind::WireNumbers, Layer::WireNumbers);
+		const QColor wn_color = layerColorForKind(DrawingLayers::FixedKind::WireNumbers);
+		const int wn_color_code = wn_color.isValid() ? Createdxf::dxfColor(wn_color) : Createdxf::dxfColor(wire_properties.text_color);
 		ConductorTextItem *textItem = cond -> textItem();
 
 		if (textItem && !ShownKinds::isHidden(textItem) && !DrawingLayers::isHidden(textItem)) {
@@ -665,7 +761,7 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 			foreach (QString line, lines) {
 				if (line.size() > 0 && line != "_" )
 					Createdxf::drawText(file_path, line, QPointF(x, y), fontSize, 360-angle,
-										Createdxf::dxfColor(wire_properties.text_color), 0.72 );
+										wn_color_code, 0.72 );
 				x += offset * xdir;
 				y -= offset * ydir;
 			}
@@ -687,14 +783,30 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 		if (attribute_texts.contains(dti))
 			continue;
 			//A free text, or a symbol's own text (its label and the like)
-		Createdxf::layer = qgraphicsitem_cast<IndependentTextItem *>(dti)
-				? Layer::Texts : Layer::SymbolTexts;
+		QColor text_color = dti->color();
+		if (qgraphicsitem_cast<IndependentTextItem *>(dti)) {
+			Createdxf::layer = dxfLayerForItem(dti, QStringLiteral("50"), Layer::Texts);
+			const QColor l_col = layerColorForItem(dti, QStringLiteral("50"));
+			if (l_col.isValid()) text_color = l_col;
+		} else {
+			const QString item_layer = DrawingLayers::layerOf(dti);
+			if (!item_layer.isEmpty()) {
+				Createdxf::layer = dxfLayerForItem(dti, QString(), Layer::SymbolTexts);
+				const QColor l_col = layerColorForItem(dti, QString());
+				if (l_col.isValid()) text_color = l_col;
+			} else {
+				Createdxf::layer = dxfLayerForKind(DrawingLayers::FixedKind::SymbolTexts, Layer::SymbolTexts);
+				const QColor l_col = layerColorForKind(DrawingLayers::FixedKind::SymbolTexts);
+				if (l_col.isValid()) text_color = l_col;
+			}
+		}
 		for (const TextLine &line : textLines(dti))
-			Createdxf::drawText(file_path, line.text, line.pos, line.font_size, 360-line.angle, Createdxf::dxfColor(dti->color()), 0.72 );
+			Createdxf::drawText(file_path, line.text, line.pos, line.font_size, 360-line.angle, Createdxf::dxfColor(text_color), 0.72 );
 	}
 
 	//Draw the slave cross-reference labels
-	Createdxf::layer = Layer::Xrefs;
+	Createdxf::layer = dxfLayerForKind(DrawingLayers::FixedKind::CrossReferences, Layer::Xrefs);
+	const QColor xref_layer_color = layerColorForKind(DrawingLayers::FixedKind::CrossReferences);
 	for (QGraphicsTextItem *xref : std::as_const(list_xref_texts))
 	{
 		qreal fontSize = xref->font().pointSizeF();
@@ -720,10 +832,11 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 
 		const QStringList lines = xref->toPlainText().split('\n');
 		const qreal offset = fontSize * 1.6;
+		const int xref_col_code = xref_layer_color.isValid() ? Createdxf::dxfColor(xref_layer_color) : Createdxf::dxfColor(xref->defaultTextColor());
 		for (const QString &line : lines) {
 			if (line.size() > 0 && line != QLatin1String("_")) {
 				Createdxf::drawText(file_path, line, QPointF(x, y), fontSize,
-									360-angle, Createdxf::dxfColor(xref->defaultTextColor()), 0.72);
+									360-angle, xref_col_code, 0.72);
 			}
 			x += offset * xdir;
 			y -= offset * ydir;
@@ -733,7 +846,7 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 	//Draw the master-side cross-reference items (table/cross), replaying
 	//their existing paint() unmodified through DxfPaintEngine instead of
 	//hand-porting drawAsCross()/drawAsContacts()/drawAsPlcTable().
-	Createdxf::layer = Layer::Xrefs;
+	Createdxf::layer = dxfLayerForKind(DrawingLayers::FixedKind::CrossReferences, Layer::Xrefs);
 	for (CrossRefItem *xref : std::as_const(list_master_xrefs))
 	{
 		DxfPaintDevice dxf_device(file_path);
@@ -763,9 +876,9 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 		painter.end();
 	}
 
-	Createdxf::layer = Layer::Images;
 	for (DiagramImageItem *image : std::as_const(list_images))
 	{
+		Createdxf::layer = dxfLayerForItem(image, QStringLiteral("60"), Layer::Images);
 		DxfPaintDevice dxf_device(file_path);
 		QPainter painter(&dxf_device);
 		painter.setWorldTransform(image->sceneTransform());

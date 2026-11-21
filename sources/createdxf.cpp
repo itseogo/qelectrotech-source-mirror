@@ -79,6 +79,17 @@ Createdxf::~Createdxf()
 void Createdxf::dxfBegin (const QString& fileName, const QStringList &layers,
 			  const std::function<void()> &writeBlocks)
 {
+	QList<LayerDef> defs;
+	defs.reserve(layers.size());
+	for (const QString &name : layers) {
+		defs.append({name, 7, 0});
+	}
+	dxfBegin(fileName, defs, writeBlocks);
+}
+
+void Createdxf::dxfBegin (const QString& fileName, const QList<LayerDef> &layers,
+			  const std::function<void()> &writeBlocks)
+{
 	layer = QStringLiteral("0");
 
 	// Creation of an output stream object in text mode.
@@ -251,13 +262,15 @@ void Createdxf::dxfBegin (const QString& fileName, const QStringList &layers,
 
 			To_Dxf << "ENDTAB"      << "\r\n";
 
-			// Layers: "0" plus the ones the entities use, all white/black
-			// (colour 7) and continuous, so a file looks the same as before
-			// until the user changes a layer.
-			QStringList all_layers{QStringLiteral("0")};
-			for (const QString &name : layers) {
-				if (!all_layers.contains(name))
-					all_layers << name;
+			// Layers: "0" plus the ones the entities use
+			QList<LayerDef> all_layers;
+			all_layers.append({QStringLiteral("0"), 7, 0});
+			QSet<QString> seen_names{QStringLiteral("0")};
+			for (const LayerDef &ld : layers) {
+				if (!seen_names.contains(ld.name) && !ld.name.isEmpty()) {
+					all_layers.append(ld);
+					seen_names.insert(ld.name);
+				}
 			}
 			To_Dxf << 0             << "\r\n";
 			To_Dxf << "TABLE"       << "\r\n";
@@ -265,15 +278,17 @@ void Createdxf::dxfBegin (const QString& fileName, const QStringList &layers,
 			To_Dxf << "LAYER"       << "\r\n";
 			To_Dxf << 70            << "\r\n";
 			To_Dxf << all_layers.size() << "\r\n";
-			for (const QString &name : std::as_const(all_layers)) {
+			for (const LayerDef &ld : std::as_const(all_layers)) {
 				To_Dxf << 0             << "\r\n";
 				To_Dxf << "LAYER"       << "\r\n";
 				To_Dxf << 2             << "\r\n";
-				To_Dxf << name          << "\r\n";
+				To_Dxf << ld.name       << "\r\n";
 				To_Dxf << 70            << "\r\n";
-				To_Dxf << 0             << "\r\n";
+				To_Dxf << ld.flags      << "\r\n";
 				To_Dxf << 62            << "\r\n";
-				To_Dxf << 7             << "\r\n";
+				int c = ld.color;
+				if (c == 0) c = 7;
+				To_Dxf << c             << "\r\n";
 				To_Dxf << 6             << "\r\n";
 				To_Dxf << "CONTINUOUS"  << "\r\n";
 			}

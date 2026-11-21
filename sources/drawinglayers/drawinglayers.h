@@ -176,6 +176,7 @@ namespace DrawingLayers
 	void						   loadStandardPresets(Set& set);
 	bool						   ensureLayer(Set& set, const QString& name);
 	QList<QPair<QString, QString>> availableLayerChoices(const Set& set);
+	QString						   dxfLayerName(const Layer& layer);
 } // namespace DrawingLayers
 
 #endif // DRAWINGLAYERS_H

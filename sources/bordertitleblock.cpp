@@ -20,6 +20,7 @@
 #include "bordercelllabels.h"
 #include "createdxf.h"
 #include "dxfexport.h"
+#include <drawinglayers/drawinglayers.h>
 #include "diagram.h"
 #include "diagramposition.h"
 #include "math.h"
@@ -967,7 +968,17 @@ void BorderTitleBlock::drawDxf(
 
 	// render the titleblock, using the TitleBlockTemplate object
 	if (display_titleblock_) {
-		Createdxf::layer = DxfExport::Layer::TitleBlock;
+		QString tb_layer = DxfExport::Layer::TitleBlock;
+		if (m_owner_folio && m_owner_folio->project()) {
+			const auto dlayers = m_owner_folio->project()->drawingLayers();
+			for (const auto &l : dlayers.layers) {
+				if (l.fixed_kind == DrawingLayers::FixedKind::FrameAndTitleBlock) {
+					tb_layer = DrawingLayers::dxfLayerName(l);
+					break;
+				}
+			}
+		}
+		Createdxf::layer = tb_layer;
 			//Laid out horizontally, then turned like the QPainter in
 			//draw(): a quarter turn counter-clockwise around its top
 			//left, which for a title block at the right is the bottom
