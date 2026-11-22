@@ -531,6 +531,9 @@ qet_add_app_test(tst_folioautonumcopy tst_folioautonumcopy.cpp)
 # A folio's group and sub-group: named, or its plant and location; title
 # block variables, kept by .qet and .qetdb, absent from older files.
 qet_add_app_test(tst_foliogroup tst_foliogroup.cpp)
+# The project panel lists folios as a tree by folio group and sub-group
+# (#1878 C9); a level shows only where it splits the folios.
+qet_add_app_test(tst_foliotree tst_foliotree.cpp)
 # "number format 1 - Plant": a conductor numbering part counting each plant
 # (=) on its own; counts kept by .qet and .qetdb.
 qet_add_app_test(tst_plantcounter tst_plantcounter.cpp)
@@ -555,6 +558,12 @@ qet_add_app_test(tst_devicetypeeditor tst_devicetypeeditor.cpp)
 qet_add_app_test(tst_devicetypelink tst_devicetypelink.cpp)
 # Asking which device type a master placed is
 qet_add_app_test(tst_devicetypechooser tst_devicetypechooser.cpp)
+# The label and the part asked when a symbol is placed
+qet_add_app_test(tst_placelabelpart tst_placelabelpart.cpp)
+# Finding a part by the words typed: exact, prefix, inside, rough, wildcard.
+qet_add_app_test(tst_partsearch tst_partsearch.cpp)
+# The Find part window: faceted filters, chips, reset, empty state, categories.
+qet_add_app_test(tst_findpart tst_findpart.cpp)
 # Giving a device another device type, its contacts carried over
 qet_add_app_test(tst_devicetypechange tst_devicetypechange.cpp)
 # The device types listed, full and brief; contacts without their device
@@ -570,6 +579,11 @@ qet_add_app_test(tst_pasteaxislock tst_pasteaxislock.cpp)
 qet_add_app_test(tst_materiallistedit tst_materiallistedit.cpp)
 # Layers of the free drawing: kept, shown and hidden.
 qet_add_app_test(tst_drawinglayers tst_drawinglayers.cpp)
+# Saying once the device type of a part of the material list.
+qet_add_app_test(tst_parttypes tst_parttypes.cpp)
+# The project's lists: on screen, per place, to CSV and PDF.
+qet_add_app_test(tst_projectreports tst_projectreports.cpp)
+qet_add_app_test(tst_placerename tst_placerename.cpp)
 # A read-only project builds its lazy folios whole: shown, exported, written out.
 qet_add_app_test(tst_readonlyfolios tst_readonlyfolios.cpp)
 target_compile_definitions(tst_readonlyfolios PRIVATE
@@ -580,6 +594,8 @@ target_compile_definitions(tst_linklists PRIVATE
   QET_EXAMPLES_DIR="${QET_DIR}/examples")
 # IEC 81346 plant/location: an element takes its folio's, %{structure_id} composes them.
 qet_add_app_test(tst_structureid tst_structureid.cpp)
+# What a symbol's label field shows: the label, or its designation (#1878 C5).
+qet_add_app_test(tst_designationdisplay tst_designationdisplay.cpp)
 qet_add_app_test(tst_stripplacefrombox tst_stripplacefrombox.cpp)
 # qet_device_list: one row per reference designation, a contact with its coil.
 qet_add_app_test(tst_devicelist tst_devicelist.cpp)
@@ -673,6 +689,7 @@ qet_add_app_test(tst_titleblockbulkformat tst_titleblockbulkformat.cpp)
 
 # %T in a report or cross reference formula is the target folio's title.
 qet_add_app_test(tst_reportfoliotitle tst_reportfoliotitle.cpp)
+qet_add_app_test(tst_reportendpoint tst_reportendpoint.cpp)
 
 # The cable cells of a terminal strip are worked out from the cables of
 # the project: wired shows the cable and its core read only, unwired keeps
@@ -703,6 +720,13 @@ qet_add_app_test(tst_symbolcustominfo tst_symbolcustominfo.cpp)
 # way a contact of a coil shows the coil's.
 qet_add_app_test(tst_plcslavelabel tst_plcslavelabel.cpp)
 
+# Deleting a folio and then linking one of its symbols to another symbol:
+# undo twice brings the folio back and the symbol with the partner it had
+# before, which it used to lose entirely.
+qet_add_app_test(tst_linkundoafterfolioremoval tst_linkundoafterfolioremoval.cpp)
+target_compile_definitions(tst_linkundoafterfolioremoval PRIVATE
+  QET_EXAMPLES_DIR="${QET_DIR}/examples")
+
 # The bridge drawn over terminals: what a bridge holds (colour, how many
 # terminals it may take, its sections), which terminals a line about to be
 # drawn crosses, and which parallel track a new bridge takes at them --
@@ -712,6 +736,12 @@ qet_add_app_test(tst_bridgetool tst_bridgetool.cpp)
 # Escape during a picture's resize, rotate or pivot drag puts it back, keeps
 # it selected and records no undo step (#1414); the key goes to the view.
 qet_add_app_test(tst_imagehandleescape tst_imagehandleescape.cpp)
+
+# "Remember the last folder a picture or a PDF was picked from" (a setting,
+# off by default): off, the dialog starts in the pictures or the documents
+# folder as it always did; on, where the last file was picked from, the two
+# folders kept apart, and the standard folder back when that one is gone.
+qet_add_app_test(tst_importdirs tst_importdirs.cpp)
 
 # The zoom step (a setting, off by default): zooming goes by a fixed number
 # of percent, also from between two steps and from a smooth mouse wheel.
@@ -830,6 +860,24 @@ qet_add_app_test(tst_linepivotresize tst_linepivotresize.cpp)
 # SortTerminalStripCommand share one comparator for it, so a strip the import
 # creates cannot come out in another order than the sort it then pushes.
 qet_add_app_test(tst_terminalstriporder tst_terminalstriporder.cpp)
+
+# A terminal strip's kind (terminal strip, plug or socket): kept by the
+# strip's xml, .qet, .qetz and .qetdb, told by qet_terminals, set by the editor.
+qet_add_app_test(tst_terminalstripkind tst_terminalstripkind.cpp)
+
+# A connector's device type: its pins are the type's parts of role terminal.
+# The check of the device types reads the connector as one device (a pin the
+# type lacks, a pin drawn twice, the free pins); strips are checked as before.
+qet_add_app_test(tst_connectordevicetype tst_connectordevicetype.cpp)
+
+# The plan of a connector as data: one row for each pin, the pins of its
+# device type drawn nowhere as spare rows, given to the drawer as they are.
+qet_add_app_test(tst_connectorpinplan tst_connectorpinplan.cpp)
+
+# A connector drawn as a device (a head symbol with its pins): the same rows,
+# read from the terminals of its symbols and their wires; offered in the
+# dialog adding a plan, saved with the folio by the uuid of its head.
+qet_add_app_test(tst_connectordeviceplan tst_connectordeviceplan.cpp)
 
 # The strip graphic names where a cable goes at its far end -- Installation,
 # Location and Label of the first piece its wires land on past the strip, in
@@ -2466,9 +2514,21 @@ qet_add_app_test(tst_dragtextswithoutshift tst_dragtextswithoutshift.cpp)
 # Potential types (#1539): a project that asks for it draws a conductor in the
 # colour, line style and width of its potential type.
 qet_add_app_test(tst_potentialtypes tst_potentialtypes.cpp)
+# The Check panel (#1878 B1): every check at once, each finding shown on
+# its folio; wires over the limit and repeated terminal names are new.
+qet_add_app_test(tst_projectcheck tst_projectcheck.cpp)
 # potential_view: one row per potential (wires, terminals, folios, wire
 # numbers, more than one number), as QElectroTech groups the wires.
 qet_add_app_test(tst_potentialview tst_potentialview.cpp)
+# Check open wire ends (#1878 B2): wires that run to an unlinked folio
+# report, into a junction on one side only, or reach one symbol terminal.
+qet_add_app_test(tst_openwireends tst_openwireends.cpp)
+target_compile_definitions(tst_openwireends PRIVATE
+  QET_EXAMPLES_DIR="${QET_DIR}/examples")
+# Chained folio reports: what two reports must share to be chained
+# together is the project's choice -- the labels they carry, or the
+# function of the wires their terminals hold.
+qet_add_app_test(tst_chainedreportkey tst_chainedreportkey.cpp)
 
 # A core of a cable: section, colour and type are locked in the dialog and
 # show a small sign saying why, so an edit cannot write over the cable
@@ -2476,6 +2536,11 @@ qet_add_app_test(tst_cablelockedfields tst_cablelockedfields.cpp)
 # IEC 60757 wire colour codes: a code picked from the list sets the colour
 # text and the drawing (green-yellow striped); typed text stays text.
 qet_add_app_test(tst_conductorcolorcodes tst_conductorcolorcodes.cpp)
+
+# A function separated terminal block: a new wire on one side takes what
+# the separation lets through from the other -- the voltage / protocol and
+# the drawing -- and a new number of its own.
+qet_add_app_test(tst_functionseparation tst_functionseparation.cpp)
 
 # Settings for every test. get_property(... TESTS) only sees the tests added
 # so far, so they wait for the end of this file: a test takes them wherever
@@ -2598,3 +2663,8 @@ qet_add_app_test(tst_titleblockcache tst_titleblockcache.cpp)
 qet_add_app_test(tst_propertieseditordialog tst_propertieseditordialog.cpp)
 # A list table reopens at the width it was saved with
 qet_add_app_test(tst_tablereopen tst_tablereopen.cpp)
+
+# An embedded symbol's location written as "project<id>+embed://..." was read
+# back only for one-digit ids: from the eleventh project opened, editing an
+# embedded symbol or placing one silently failed (#1958).
+qet_add_app_test(tst_projectidlocation tst_projectidlocation.cpp)

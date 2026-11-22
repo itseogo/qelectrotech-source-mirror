@@ -773,6 +773,11 @@ void Terminal::mouseReleaseEvent(QGraphicsSceneMouseEvent *e)
 	}
 	else
 	{
+			//This side of a function separated terminal element holds no
+			//wire to take anything from: what the separation lets through
+			//comes from the other side of it (@see
+			//Conductor::applySeparatedNodePropertiesIfEmpty)
+		new_conductor->applySeparatedNodePropertiesIfEmpty();
 		//Autonum it
 		ConductorAutoNumerotation can (new_conductor, diagram(), undo);
 		can.numerate();
@@ -1182,18 +1187,30 @@ void Terminal::setMasterLabelIndex(int index)
 	enabled does not keep its terminals apart: they all count as one
 	potential, the way they do when the option is disabled. Only the
 	callers that need the conductors a separation hides -- so that the
-	one property still allowed to cross it, the voltage / protocol, can
-	be applied there (@see Conductor::functionSeparatedConductors) --
+	few properties still allowed to cross it, the voltage / protocol and
+	the drawing of the wire, can be applied there
+	(@see Conductor::functionSeparatedConductors) --
 	pass true; every other caller keeps the default.
+	@param stop_at_report_links : if true, a folio report does not join
+	its two wires: a name written over a potential stays on the folio it
+	is written on, and the chaining makes the links again afterwards
+	(QETProject::reportKeySourceChanged)
 	@return the list of terminal at the same potential
 */
 QList<Terminal *> relatedPotentialTerminal (
 		const Terminal *terminal, const bool all_diagram,
-		const bool ignore_function_separation)
+		const bool ignore_function_separation,
+		const bool stop_at_report_links)
 {
 	// If terminal parent element is a folio report.
 	if (all_diagram && terminal -> parentElement() -> linkType() & Element::AllReport)
 	{
+			//The wires a report joins are one wire, but they need not
+			//carry the same name: the name written over the potential
+			//stays on its folio
+		if (stop_at_report_links) {
+			return {};
+		}
 			//The report's partner on a folio not built yet (lazy folios)
 			//is built, so that a potential is followed as far as when every
 			//folio is; not while folios are being read or built, which
