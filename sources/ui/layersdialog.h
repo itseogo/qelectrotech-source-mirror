@@ -22,6 +22,8 @@
 #include <QPointer>
 
 class Diagram;
+class QGraphicsObject;
+class QGroupBox;
 class QLabel;
 class QETProject;
 class QListWidget;
@@ -66,22 +68,33 @@ class LayersDialog : public QDialog
 	void updateButtonStates();
 
   private:
+	struct LayerItemEntry
+	{
+		QPointer<Diagram>		  folio;
+		QPointer<QGraphicsObject> item;
+	};
+
 	QString currentLayer() const;
 	QString currentGroup() const;
 	void	showGroupMembers();
+	void	showLayerItems();
+	void	navigateToLayerItem(int row);
 	void	buildFolios();
 
-	QPointer<QETProject> m_project;
-	QLineEdit*			 m_filter_edit = nullptr;
-	QTableWidget*		 m_layers;
-	QListWidget*		 m_groups;
-	QListWidget*		 m_members;
-	QLabel*				 m_summary;
-	QPushButton*		 m_rename_btn = nullptr;
-	QPushButton*		 m_remove_btn = nullptr;
-	QPushButton*		 m_put_btn	  = nullptr;
-	QPushButton*		 m_take_btn	  = nullptr;
-	bool				 m_refreshing = false;
+	QPointer<QETProject>  m_project;
+	QLineEdit*			  m_filter_edit = nullptr;
+	QTableWidget*		  m_layers;
+	QGroupBox*			  m_items_box	= nullptr;
+	QTableWidget*		  m_layer_items = nullptr;
+	QList<LayerItemEntry> m_item_entries;
+	QListWidget*		  m_groups;
+	QListWidget*		  m_members;
+	QLabel*				  m_summary;
+	QPushButton*		  m_rename_btn = nullptr;
+	QPushButton*		  m_remove_btn = nullptr;
+	QPushButton*		  m_put_btn	   = nullptr;
+	QPushButton*		  m_take_btn   = nullptr;
+	bool				  m_refreshing = false;
 };
 
 #endif // LAYERSDIALOG_H

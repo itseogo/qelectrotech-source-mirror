@@ -42,8 +42,18 @@
 #include <projectview.h>
 #include <qet.h>
 #include <qetdiagrameditor.h>
+#include <qetgraphicsitem/conductortextitem.h>
+#include <qetgraphicsitem/crossrefitem.h>
+#include <qetgraphicsitem/diagramimageitem.h>
+#include <qetgraphicsitem/diagramtextitem.h>
+#include <qetgraphicsitem/dynamicelementtextitem.h>
+#include <qetgraphicsitem/element.h>
+#include <qetgraphicsitem/independenttextitem.h>
+#include <qetgraphicsitem/qetshapeitem.h>
+#include <qetgraphicsitem/structureboxitem.h>
 #include <qetmessagebox.h>
 #include <qetproject.h>
+#include <shownkinds.h>
 #include <undocommand/drawinglayerscommand.h>
 
 namespace
@@ -102,7 +112,7 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 	m_summary(new QLabel(this))
 {
 	setWindowTitle(tr("Layers"));
-	resize(720, 540);
+	resize(780, 680);
 	auto* layout = new QVBoxLayout(this);
 	m_summary->setWordWrap(true);
 	m_summary->setObjectName(QStringLiteral("layersSummary"));
@@ -180,7 +190,29 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 		button(layer_buttons, tr("Load standard layers"), "layerLoadStandards");
 	layer_buttons->addStretch();
 	layers_layout->addLayout(layer_buttons);
-	layout->addWidget(layers_box, 1);
+	layout->addWidget(layers_box, 2);
+
+	m_items_box = new QGroupBox(tr("Elements on selected layer"), this);
+	auto* items_layout = new QVBoxLayout(m_items_box);
+	m_layer_items	   = new QTableWidget(0, 3, this);
+	m_layer_items->setObjectName(QStringLiteral("layerItemsTable"));
+	m_layer_items->setHorizontalHeaderLabels(
+		{tr("Folio"), tr("Type"), tr("Element / Text")});
+	m_layer_items->verticalHeader()->setVisible(false);
+	m_layer_items->setSelectionBehavior(QAbstractItemView::SelectRows);
+	m_layer_items->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_layer_items->setEditTriggers(QAbstractItemView::NoEditTriggers);
+	m_layer_items->horizontalHeader()->setSectionResizeMode(
+		0,
+		QHeaderView::ResizeToContents);
+	m_layer_items->horizontalHeader()->setSectionResizeMode(
+		1,
+		QHeaderView::ResizeToContents);
+	m_layer_items->horizontalHeader()->setSectionResizeMode(
+		2,
+		QHeaderView::Stretch);
+	items_layout->addWidget(m_layer_items);
+	layout->addWidget(m_items_box, 1);
 
 	auto* groups_box =
 		new QGroupBox(tr("Layer groups: the layers to show together"), this);
@@ -304,7 +336,16 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 		m_layers,
 		&QTableWidget::itemSelectionChanged,
 		this,
-		&LayersDialog::updateButtonStates);
+		[this]()
+		{
+			updateButtonStates();
+			showLayerItems();
+		});
+	connect(
+		m_layer_items,
+		&QTableWidget::cellDoubleClicked,
+		this,
+		[this](int row, int /*column*/) { navigateToLayerItem(row); });
 	connect(
 		m_layers,
 		&QTableWidget::itemChanged,
@@ -564,9 +605,228 @@ void LayersDialog::refresh()
 	m_refreshing = false;
 	showGroupMembers();
 	updateButtonStates();
+	showLayerItems();
 	if (m_filter_edit && ! m_filter_edit->text().isEmpty())
 	{
 		filterLayers(m_filter_edit->text());
+	}
+}
+
+void LayersDialog::showLayerItems()
+{
+	if (! m_layer_items || ! m_items_box) return;
+	m_layer_items->setRowCount(0);
+	m_item_entries.clear();
+
+	const QString layer = currentLayer();
+	if (! m_project || layer.isEmpty())
+	{
+		m_items_box->setTitle(tr("Elements on selected layer"));
+		return;
+	}
+
+	const DrawingLayers::FixedKind fk	  = DrawingLayers::fixedKindOf(layer);
+	const QString				   desc	  = m_project->drawingLayers().description(layer);
+	const QString				   header = desc.isEmpty() ?
+												layer :
+												QStringLiteral("%1 - %2").arg(layer, desc);
+
+	auto addRow = [this](
+					  Diagram*		   folio,
+					  QGraphicsObject* obj,
+					  const QString&   folio_label,
+					  const QString&   type_label,
+					  const QString&   detail)
+	{
+		const int row = m_layer_items->rowCount();
+		m_layer_items->insertRow(row);
+		m_layer_items->setItem(row, 0, new QTableWidgetItem(folio_label));
+		m_layer_items->setItem(row, 1, new QTableWidgetItem(type_label));
+		m_layer_items->setItem(row, 2, new QTableWidgetItem(detail));
+		m_item_entries.append({folio, obj});
+	};
+
+	int folio_index = 0;
+	for (Diagram* folio : m_project->diagrams())
+	{
+		++folio_index;
+		const QString folio_title = folio->title().trimmed();
+		const QString folio_label =
+			folio_title.isEmpty() ?
+				tr("Folio %1").arg(folio_index) :
+				QStringLiteral("%1 - %2").arg(folio_index).arg(folio_title);
+
+		if (fk == DrawingLayers::FixedKind::FrameAndTitleBlock)
+		{
+			addRow(
+				folio,
+				nullptr,
+				folio_label,
+				tr("Frame and title block"),
+				folio_title.isEmpty() ? tr("Sheet border") : folio_title);
+			continue;
+		}
+
+		for (QGraphicsItem* item : folio->items())
+		{
+			bool		  matched		 = false;
+			const QString explicit_layer = DrawingLayers::layerOf(item);
+
+			if (! explicit_layer.isEmpty())
+			{
+				if (explicit_layer == layer
+					|| (fk != DrawingLayers::FixedKind::None
+						&& DrawingLayers::fixedKindOf(explicit_layer) == fk))
+				{
+					matched = true;
+				}
+			}
+			else
+			{
+				const QVariant val = item->data(ShownKinds::data_key);
+				if (val.isValid())
+				{
+					const int kind = val.toInt();
+					if ((kind == ShownKinds::WireNumbers
+						 && fk == DrawingLayers::FixedKind::WireNumbers)
+						|| (kind == ShownKinds::SymbolTexts
+							&& fk == DrawingLayers::FixedKind::SymbolTexts)
+						|| (kind == ShownKinds::CrossReferences
+							&& fk == DrawingLayers::FixedKind::CrossReferences))
+					{
+						matched = true;
+					}
+				}
+			}
+
+			if (! matched) continue;
+
+			QString type_label;
+			QString detail;
+
+			if (auto* box = qgraphicsitem_cast<StructureBoxItem*>(item))
+			{
+				type_label = tr("Structure box");
+				detail	   = box->structureId();
+				if (detail.isEmpty()) detail = tr("Structure box");
+			}
+			else if (auto* shape = qgraphicsitem_cast<QetShapeItem*>(item))
+			{
+				switch (shape->shapeType())
+				{
+				case QetShapeItem::Line: type_label = tr("Line"); break;
+				case QetShapeItem::Rectangle:
+					type_label = tr("Rectangle");
+					break;
+				case QetShapeItem::Ellipse: type_label = tr("Ellipse"); break;
+				case QetShapeItem::Polygon: type_label = tr("Polygon"); break;
+				case QetShapeItem::Path: type_label = tr("Path"); break;
+				default: type_label = tr("Shape"); break;
+				}
+				const QPointF pos = shape->scenePos();
+				detail = QStringLiteral("(%1, %2)")
+							 .arg(qRound(pos.x()))
+							 .arg(qRound(pos.y()));
+			}
+			else if (auto* text = qgraphicsitem_cast<IndependentTextItem*>(item))
+			{
+				type_label = tr("Free text");
+				detail	   = text->toPlainText().simplified();
+			}
+			else if (auto* img = qgraphicsitem_cast<DiagramImageItem*>(item))
+			{
+				type_label = tr("Picture");
+				const QPixmap pm = img->pixmap();
+				detail = QStringLiteral("%1 x %2 px")
+							 .arg(pm.width())
+							 .arg(pm.height());
+			}
+			else if (
+				auto* dyn = qgraphicsitem_cast<DynamicElementTextItem*>(item))
+			{
+				type_label		  = tr("Symbol text");
+				const QString txt = dyn->toPlainText().simplified();
+				QString		  parent_label;
+				if (Element* el = dyn->parentElement())
+				{
+					parent_label =
+						el->elementInformations()[QStringLiteral("label")]
+							.toString()
+							.trimmed();
+				}
+				if (! parent_label.isEmpty() && parent_label != txt)
+					detail = QStringLiteral("%1: %2").arg(parent_label, txt);
+				else
+					detail = txt;
+			}
+			else if (auto* ct = qgraphicsitem_cast<ConductorTextItem*>(item))
+			{
+				type_label = tr("Wire number");
+				detail	   = ct->toPlainText().simplified();
+			}
+			else if (auto* xref = qgraphicsitem_cast<CrossRefItem*>(item))
+			{
+				type_label = tr("Cross-reference");
+				Element* el = qgraphicsitem_cast<Element*>(xref->parentItem());
+				if (! el)
+				{
+					if (auto* dyn_parent =
+							qgraphicsitem_cast<DynamicElementTextItem*>(
+								xref->parentItem()))
+						el = dyn_parent->parentElement();
+				}
+				if (el)
+				{
+					detail = el->elementInformations()[QStringLiteral("label")]
+								 .toString()
+								 .trimmed();
+				}
+				if (detail.isEmpty()) detail = tr("Cross-reference");
+			}
+			else if (auto* dt = dynamic_cast<DiagramTextItem*>(item))
+			{
+				type_label = tr("Text");
+				detail	   = dt->toPlainText().simplified();
+			}
+			else
+			{
+				type_label = tr("Element");
+			}
+
+			addRow(
+				folio,
+				item->toGraphicsObject(),
+				folio_label,
+				type_label,
+				detail);
+		}
+	}
+
+	m_items_box->setTitle(
+		tr("Elements on layer \"%1\" (%2)")
+			.arg(header, QString::number(m_layer_items->rowCount())));
+}
+
+void LayersDialog::navigateToLayerItem(int row)
+{
+	if (row < 0 || row >= m_item_entries.size()) return;
+	const LayerItemEntry& entry = m_item_entries.at(row);
+	if (! entry.folio) return;
+
+	if (auto* editor = qobject_cast<QETDiagramEditor*>(parentWidget()))
+	{
+		if (ProjectView* view = editor->currentProjectView())
+		{
+			view->showDiagram(entry.folio);
+			if (entry.item && entry.item->scene() == entry.folio)
+			{
+				entry.folio->clearSelection();
+				if (entry.item->flags() & QGraphicsItem::ItemIsSelectable)
+					entry.item->setSelected(true);
+				if (DiagramView* dv = view->currentDiagram())
+					dv->centerOn(entry.item);
+			}
+		}
 	}
 }
 

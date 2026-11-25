@@ -941,6 +941,62 @@ class tst_drawinglayers : public QObject
 			const QString layer10_dxf_name = DrawingLayers::dxfLayerName(l10);
 			QVERIFY(dxf_content.contains(layer10_dxf_name));
 		}
+
+		// LayersDialog displays assigned elements for the currently selected layer
+		{
+			QETProject nav_project;
+			Diagram*   nav_folio = nav_project.addNewDiagram();
+
+			auto* note = new IndependentTextItem(QStringLiteral("Note on 50"));
+			nav_folio->addItem(note);
+			QCOMPARE(note->layer(), QStringLiteral("50"));
+
+			auto* pic = new DiagramImageItem();
+			nav_folio->addItem(pic);
+			QCOMPARE(pic->layer(), QStringLiteral("60"));
+
+			LayersDialog nav_dialog(&nav_project);
+			QVERIFY(nav_dialog.addLayer(QStringLiteral("CustomNotes")));
+			auto* custom_line = new QetShapeItem(
+				QPointF(0, 0),
+				QPointF(40, 0),
+				QetShapeItem::Line);
+			nav_folio->addItem(custom_line);
+			DrawingLayers::setLayerOf(custom_line, QStringLiteral("CustomNotes"));
+			nav_dialog.refresh();
+
+			auto* layers_table =
+				nav_dialog.findChild<QTableWidget*>(QStringLiteral("layersTable"));
+			auto* items_table =
+				nav_dialog.findChild<QTableWidget*>(QStringLiteral("layerItemsTable"));
+			QVERIFY(layers_table);
+			QVERIFY(items_table);
+
+			auto selectLayerRow = [&](const QString& layer_name) {
+				for (int r = 0; r < layers_table->rowCount(); ++r)
+				{
+					if (layers_table->item(r, 0)->text() == layer_name)
+					{
+						layers_table->selectRow(r);
+						return true;
+					}
+				}
+				return false;
+			};
+
+			QVERIFY(selectLayerRow(QStringLiteral("10")));
+			QCOMPARE(items_table->rowCount(), 1);
+
+			QVERIFY(selectLayerRow(QStringLiteral("50")));
+			QCOMPARE(items_table->rowCount(), 1);
+			QCOMPARE(items_table->item(0, 2)->text(), QStringLiteral("Note on 50"));
+
+			QVERIFY(selectLayerRow(QStringLiteral("60")));
+			QCOMPARE(items_table->rowCount(), 1);
+
+			QVERIFY(selectLayerRow(QStringLiteral("CustomNotes")));
+			QCOMPARE(items_table->rowCount(), 1);
+		}
 	}
 };
 
