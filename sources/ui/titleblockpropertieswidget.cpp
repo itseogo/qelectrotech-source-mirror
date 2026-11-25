@@ -16,6 +16,7 @@
 	along with QElectroTech.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "titleblockpropertieswidget.h"
+#include "placesuggestions.h"
 
 #include <qetapp.h>
 #include <qeticons.h>
@@ -121,6 +122,8 @@ void TitleBlockPropertiesWidget::setProperties(
 	ui -> m_loc           -> setText (properties.locmach);
 	ui -> m_folio_group_le    -> setText (properties.folio_group);
 	ui -> m_folio_subgroup_le -> setText (properties.folio_subgroup);
+	ui -> m_higher_plant_le    -> setText (properties.higher_plant);
+	ui -> m_higher_location_le -> setText (properties.higher_location);
 	ui -> m_indice        -> setText (properties.indexrev);
 	ui -> m_folio_le      -> setText (properties.folio);
 	ui -> m_display_at_cb -> setCurrentIndex(properties.display_at == Qt::BottomEdge ? 0 : 1);
@@ -189,6 +192,8 @@ TitleBlockProperties TitleBlockPropertiesWidget::properties() const
 	prop.locmach    = ui -> m_loc           -> text();
 	prop.folio_group    = ui -> m_folio_group_le    -> text();
 	prop.folio_subgroup = ui -> m_folio_subgroup_le -> text();
+	prop.higher_plant    = ui -> m_higher_plant_le    -> text();
+	prop.higher_location = ui -> m_higher_location_le -> text();
 	prop.indexrev   = ui -> m_indice        -> text();
 	prop.folio      = ui -> m_folio_le      -> text();
 	prop.display_at = ui -> m_display_at_cb -> currentIndex() == 0 ? Qt::BottomEdge : Qt::RightEdge;
@@ -257,6 +262,8 @@ TitleBlockProperties TitleBlockPropertiesWidget::propertiesAutoNum(
 	prop.locmach  = ui -> m_loc       -> text();
 	prop.folio_group    = ui -> m_folio_group_le    -> text();
 	prop.folio_subgroup = ui -> m_folio_subgroup_le -> text();
+	prop.higher_plant    = ui -> m_higher_plant_le    -> text();
+	prop.higher_location = ui -> m_higher_location_le -> text();
 	prop.indexrev = ui -> m_indice    -> text();
 	prop.folio    = "%autonum";
 	prop.display_at = ui -> m_display_at_cb -> currentIndex() == 0 ? Qt::BottomEdge : Qt::RightEdge;
@@ -450,6 +457,7 @@ void TitleBlockPropertiesWidget::initDialog(
 			ui->m_folio_subgroup_le, &QLineEdit::setPlaceholderText);
 
 	if (project!= nullptr){
+		PlaceSuggestions::attach(ui->m_plant, ui->m_loc, project);
 		keys_2 = project -> folioAutoNum().keys();
 		foreach (QString str, keys_2) { ui -> auto_page_cb -> addItem(str); }
 		if (ui->auto_page_cb->currentText()==nullptr)
@@ -590,6 +598,7 @@ void TitleBlockPropertiesWidget::addTemplateVariables(
 		QStringLiteral("title"), QStringLiteral("filename"),
 		QStringLiteral("plant"), QStringLiteral("locmach"),
 		QStringLiteral("folio_group"), QStringLiteral("folio_subgroup"),
+		QStringLiteral("higher_plant"), QStringLiteral("higher_location"),
 		QStringLiteral("indexrev"), QStringLiteral("version"),
 		QStringLiteral("folio"), QStringLiteral("folio-id"),
 		QStringLiteral("folio-total"), QStringLiteral("auto_page_num"),

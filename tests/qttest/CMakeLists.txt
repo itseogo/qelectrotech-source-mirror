@@ -481,6 +481,17 @@ set_tests_properties(tst_textanchor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offs
 target_include_directories(tst_textanchor PRIVATE ${QET_DIR}/sources)
 target_link_libraries(tst_textanchor PRIVATE Qt::Test Qt::Widgets)
 
+# printdrawing.h is header-only: a folio printed or exported to SVG fits
+# its page on a 96 dpi screen and on a 72 dpi one, as on macOS (#1977).
+add_executable(tst_printdrawing tst_printdrawing.cpp)
+foreach(dpi 96 72)
+  add_test(NAME tst_printdrawing_${dpi}dpi COMMAND tst_printdrawing)
+  set_tests_properties(tst_printdrawing_${dpi}dpi PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_FONT_DPI=${dpi}")
+endforeach()
+target_include_directories(tst_printdrawing PRIVATE ${QET_DIR}/sources)
+target_link_libraries(tst_printdrawing PRIVATE Qt::Test Qt::Widgets Qt::Svg)
+
 # Shared handle geometry and picking, including fractional sizes.
 add_executable(tst_handlersize tst_handlersize.cpp
   ${QET_DIR}/sources/QetGraphicsItemModeler/qetgraphicshandleritem.cpp)
@@ -583,6 +594,10 @@ qet_add_app_test(tst_drawinglayers tst_drawinglayers.cpp)
 qet_add_app_test(tst_parttypes tst_parttypes.cpp)
 # The project's lists: on screen, per place, to CSV and PDF.
 qet_add_app_test(tst_projectreports tst_projectreports.cpp)
+# Suggesting the project's plants and locations while one is typed.
+qet_add_app_test(tst_placesuggestions tst_placesuggestions.cpp)
+
+# Renaming a plant or a location in the whole project, in one undo step.
 qet_add_app_test(tst_placerename tst_placerename.cpp)
 # A read-only project builds its lazy folios whole: shown, exported, written out.
 qet_add_app_test(tst_readonlyfolios tst_readonlyfolios.cpp)
@@ -1712,6 +1727,18 @@ if(QET_HAS_SCRIPTING)
     "QET_TEST_BINARY_PATH=\"$<TARGET_FILE:qelectrotech>\""
     "QET_EXAMPLES_DIR=\"${QET_DIR}/examples\"")
 
+  # Renaming a plant or a location from a script (#1878 C10, stage L4): the
+  # same single undo step as the screen, merging only when the script says so.
+  add_executable(
+    tst_scriptplacerename
+    tst_scriptplacerename.cpp)
+  add_test(NAME tst_scriptplacerename COMMAND tst_scriptplacerename)
+  add_dependencies(tst_scriptplacerename qelectrotech)
+  target_link_libraries(tst_scriptplacerename PRIVATE Qt::Test)
+  target_compile_definitions(tst_scriptplacerename PRIVATE
+    "QET_TEST_BINARY_PATH=\"$<TARGET_FILE:qelectrotech>\""
+    "QET_EXAMPLES_DIR=\"${QET_DIR}/examples\"")
+
   # A project can keep the texts of its turned symbols horizontal: the
   # DXF of a turned folio of tremie_vibrante.qet with the setting off and on.
   add_executable(
@@ -2416,6 +2443,9 @@ qet_add_app_test(tst_terminalhelplines tst_terminalhelplines.cpp)
 # While placing, the folio knows the symbol that follows the mouse: the
 # crosshair leaves it out, so a corner turned by Space stays visible.
 qet_add_app_test(tst_pendingelement tst_pendingelement.cpp)
+# A file handed over while a project is read waits for it, instead of being
+# read inside it and crashing on the closed progress dialog (#1978).
+qet_add_app_test(tst_openwhilereading tst_openwhilereading.cpp)
 
 # Which working copies a QElectroTech that did not close normally left are
 # offered at the next start, and which are deleted. QET-SQL-FORMAT S3z3.
@@ -2524,6 +2554,11 @@ qet_add_app_test(tst_potentialview tst_potentialview.cpp)
 # report, into a junction on one side only, or reach one symbol terminal.
 qet_add_app_test(tst_openwireends tst_openwireends.cpp)
 target_compile_definitions(tst_openwireends PRIVATE
+  QET_EXAMPLES_DIR="${QET_DIR}/examples")
+# Branches between strip terminals (#1878 B4): a junction on a wire between
+# two terminal strip terminals, with a third wire going off it.
+qet_add_app_test(tst_terminalbranches tst_terminalbranches.cpp)
+target_compile_definitions(tst_terminalbranches PRIVATE
   QET_EXAMPLES_DIR="${QET_DIR}/examples")
 # Chained folio reports: what two reports must share to be chained
 # together is the project's choice -- the labels they carry, or the
@@ -2668,3 +2703,8 @@ qet_add_app_test(tst_tablereopen tst_tablereopen.cpp)
 # back only for one-digit ids: from the eleventh project opened, editing an
 # embedded symbol or placing one silently failed (#1958).
 qet_add_app_test(tst_projectidlocation tst_projectidlocation.cpp)
+# The library listing (#1878 A8): a row per symbol and macro of a
+# collection folder, with its terminal names and class letter.
+qet_add_app_test(tst_librarylisting tst_librarylisting.cpp)
+target_compile_definitions(tst_librarylisting PRIVATE
+  QET_ELEMENTS_DIR="${QET_DIR}/elements")
