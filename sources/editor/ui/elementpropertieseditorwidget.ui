@@ -65,6 +65,24 @@
         </widget>
        </item>
        <item>
+        <layout class="QHBoxLayout" name="m_default_layer_layout">
+         <item>
+          <widget class="QLabel" name="m_default_layer_label">
+           <property name="text">
+            <string>Default layer:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="m_default_layer_cb">
+           <property name="editable">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
         <widget class="QGroupBox" name="m_slave_gb">
          <property name="title">
           <string>Slave element</string>

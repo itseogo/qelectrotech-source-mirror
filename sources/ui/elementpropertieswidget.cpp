@@ -20,8 +20,11 @@
 
 #include <diagram.h>
 #include <diagramposition.h>
+#include <drawinglayers/drawinglayers.h>
 #include <qetapp.h>
 #include <qetproject.h>
+#include <undocommand/drawinglayerscommand.h>
+#include <QComboBox>
 #include <QSettings>
 #include <qetgraphicsitem/dynamicelementtextitem.h>
 #include <qetgraphicsitem/element.h>
@@ -558,6 +561,49 @@ QWidget *ElementPropertiesWidget::generalWidget()
 		}
 	});
 	vlayout_->addWidget(lock_pos_cb);
+
+		//layer assignment for the element (e.g. installation plans: EDV, Elektroinstallation)
+	if (project) {
+		QHBoxLayout *layer_layout = new QHBoxLayout;
+		QLabel *layer_label = new QLabel(tr("Layer:"), general_widget);
+		QComboBox *layer_cb = new QComboBox(general_widget);
+		layer_cb->setObjectName(QStringLiteral("m_element_layer_cb"));
+		layer_cb->addItem(tr("Default (none)"), QString());
+		for (const auto &choice : DrawingLayers::availableLayerChoices(project->drawingLayers())) {
+			const DrawingLayers::FixedKind fk = DrawingLayers::fixedKindOf(choice.first);
+			if (fk == DrawingLayers::FixedKind::FrameAndTitleBlock ||
+				fk == DrawingLayers::FixedKind::WireNumbers ||
+				fk == DrawingLayers::FixedKind::SymbolTexts ||
+				fk == DrawingLayers::FixedKind::CrossReferences) {
+				continue;
+			}
+			const QString label_text = choice.second.isEmpty()
+				? choice.first
+				: QStringLiteral("%1 - %2").arg(choice.first, choice.second);
+			layer_cb->addItem(label_text, choice.first);
+		}
+		const QString cur_layer = m_element->layer();
+		int idx = layer_cb->findData(cur_layer);
+		if (idx < 0 && !cur_layer.isEmpty()) {
+			layer_cb->addItem(cur_layer, cur_layer);
+			idx = layer_cb->count() - 1;
+		}
+		layer_cb->setCurrentIndex(idx >= 0 ? idx : 0);
+		QPointer<QETProject> proj_ptr = project;
+		connect(layer_cb, QOverload<int>::of(&QComboBox::activated), this,
+				[element, proj_ptr, layer_cb](int index) {
+			if (!element || !proj_ptr) return;
+			const QString new_layer = layer_cb->itemData(index).toString();
+			if (element->layer() == new_layer) return;
+			QHash<QGraphicsObject *, QString> items;
+			items.insert(element.data(), new_layer);
+			proj_ptr->undoStack()->push(
+				new DrawingLayersCommand(proj_ptr, proj_ptr->drawingLayers(), items));
+		});
+		layer_layout->addWidget(layer_label);
+		layer_layout->addWidget(layer_cb, 1);
+		vlayout_->addLayout(layer_layout);
+	}
 
 		//widget for the pixmap
 	QLabel *pix = new QLabel(general_widget);

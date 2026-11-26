@@ -336,6 +336,7 @@ void ElementPropertiesEditorWidget::upDateInterface()
 
 	ui->m_exclude_from_bom_cb->setChecked(
 		QET::infoFlagIsTrue(m_data.m_informations.value(QStringLiteral("exclude_from_bom")).toString()));
+	ui->m_default_layer_cb->setCurrentText(m_data.m_default_layer);
 
 	on_m_base_type_cb_currentIndexChanged(ui->m_base_type_cb->currentIndex());
 }
@@ -355,6 +356,15 @@ void ElementPropertiesEditorWidget::setUpInterface()
 	ui->m_base_type_cb->addItem (tr("Junction"), ElementData::Junction);
 	ui->m_base_type_cb->addItem (tr("Thumbnail"), ElementData::Thumbnail);
 	ui->m_base_type_cb->addItem (tr("Conductor definition"), ElementData::ConductorDefinition);
+
+		// Default layer combo box (optional, editable for custom layers like EDV / Elektroinstallation)
+	ui->m_default_layer_cb->setEditable(true);
+	ui->m_default_layer_cb->setInsertPolicy(QComboBox::NoInsert);
+	ui->m_default_layer_cb->addItem(QString());
+	if (auto *le = ui->m_default_layer_cb->lineEdit()) {
+		le->setPlaceholderText(tr("None (optional, e.g. EDV, Elektroinstallation)"));
+		le->setClearButtonEnabled(true);
+	}
 
 		// Slave option
 	ui->m_state_cb->addItem(tr("Switch normally open"),       ElementData::NO);
@@ -960,6 +970,7 @@ void ElementPropertiesEditorWidget::junctionRoleChanged(int row)
 void ElementPropertiesEditorWidget::on_m_buttonBox_accepted()
 {
 	m_data.m_type = ui->m_base_type_cb->currentData().value<ElementData::Type>();
+	m_data.m_default_layer = ui->m_default_layer_cb->currentText().trimmed();
 
 	if (m_data.m_type == ElementData::Slave)
 	{

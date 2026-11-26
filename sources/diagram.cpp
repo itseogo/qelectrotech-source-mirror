@@ -3063,6 +3063,18 @@ void Diagram::addItem(QGraphicsItem *item)
 		{
 			Element *elmt = static_cast<Element *>(item);
 			m_project->dataBase()->addElement(elmt);
+			if (m_project) {
+				const QString el_layer = DrawingLayers::layerOf(elmt);
+				if (!el_layer.isEmpty()) {
+					if (!m_project->drawingLayers().contains(el_layer)) {
+						DrawingLayers::Set set = m_project->drawingLayers();
+						if (DrawingLayers::ensureLayer(set, el_layer, true)) {
+							m_project->setDrawingLayers(set);
+						}
+					}
+					DrawingLayers::apply(elmt, m_project->drawingLayers());
+				}
+			}
 			if ((elmt->linkType() & Element::AllReport) && m_project->chainedReports()) {
 				m_project->scheduleAutoLink();
 			}

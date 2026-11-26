@@ -50,6 +50,7 @@ bool ElementData::fromXml(const QDomElement &xml_element)
 		}
 
 	m_type = typeFromString(xml_element.attribute(QStringLiteral("link_type"), QStringLiteral("simple")));
+	m_default_layer = xml_element.attribute(QStringLiteral("default_layer")).trimmed();
 
 	kindInfoFromXml(xml_element);
 	m_informations.fromXml(xml_element.firstChildElement(QStringLiteral("elementInformations")),
@@ -757,6 +758,10 @@ bool ElementData::operator==(const ElementData &data) const
 	}
 
 	if (m_drawing_information != m_drawing_information) {
+		return false;
+	}
+
+	if (data.m_default_layer != m_default_layer) {
 		return false;
 	}
 

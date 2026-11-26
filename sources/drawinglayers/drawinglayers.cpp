@@ -20,6 +20,7 @@
 #include "../diagram.h"
 #include "../qetgraphicsitem/diagramimageitem.h"
 #include "../qetgraphicsitem/dynamicelementtextitem.h"
+#include "../qetgraphicsitem/element.h"
 #include "../qetgraphicsitem/independenttextitem.h"
 #include "../qetgraphicsitem/qetshapeitem.h"
 #include "../qetgraphicsitem/structureboxitem.h"
@@ -634,7 +635,8 @@ namespace DrawingLayers
 			   || qgraphicsitem_cast<const StructureBoxItem*>(item)
 			   || qgraphicsitem_cast<const IndependentTextItem*>(item)
 			   || qgraphicsitem_cast<const DiagramImageItem*>(item)
-			   || qgraphicsitem_cast<const DynamicElementTextItem*>(item);
+			   || qgraphicsitem_cast<const DynamicElementTextItem*>(item)
+			   || qgraphicsitem_cast<const Element*>(item);
 	}
 
 	/**
@@ -1196,7 +1198,7 @@ namespace DrawingLayers
 		}
 	}
 
-	bool ensureLayer(Set& set, const QString& name)
+	bool ensureLayer(Set& set, const QString& name, bool create_custom)
 	{
 		if (name.isEmpty() || set.contains(name)) return false;
 		for (const Layer& preset : standardPresetLayers())
@@ -1206,6 +1208,12 @@ namespace DrawingLayers
 				set.layers.append(preset);
 				return true;
 			}
+		}
+		if (create_custom)
+		{
+			set.layers.append(
+				{name, QString(), true, true, false, FixedKind::None});
+			return true;
 		}
 		return false;
 	}

@@ -345,6 +345,8 @@ class ElementData : public PropertiesInterface
 		QStringList m_custom_info_keys;
 		NamesList m_names_list;
 		QString m_drawing_information;
+			/// Optional default drawing layer assigned when this symbol is placed
+		QString m_default_layer;
 
 	private:
 		ElementData::TerminalType m_override_terminal_type = ElementData::TTGeneric;

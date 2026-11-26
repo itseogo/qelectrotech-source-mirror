@@ -27,6 +27,7 @@
 #include <autoNum/elementautonumschemecommand.h>
 #include <autoNum/numerotationcontextcommands.h>
 #include <diagram.h>
+#include <drawinglayers/drawinglayers.h>
 #include <shownkinds.h>
 #include <diagramcommands.h>
 #include <diagramcontext.h>
@@ -1063,6 +1064,9 @@ bool Element::buildFromXml(const QDomElement &xml_def_elmt, int *state)
 	}
 
 	m_data.fromXml(xml_def_elmt);
+	if (!m_data.m_default_layer.isEmpty() && DrawingLayers::layerOf(this).isEmpty()) {
+		DrawingLayers::setLayerOf(this, m_data.m_default_layer);
+	}
 	setToolTip(name());
 
 	QString my_type_str = xml_def_elmt.attribute(QStringLiteral("link_type"), QStringLiteral("simple"));
@@ -1739,8 +1743,33 @@ bool Element::fromXml(QDomElement &e,
 	setMirror(mirror == QLatin1String("horizontal") || mirror == QLatin1String("both"),
 			  mirror == QLatin1String("vertical") || mirror == QLatin1String("both"));
 
+	if (e.hasAttribute(QStringLiteral("layer"))) {
+		DrawingLayers::readAttribute(this, e);
+	}
+
 	m_state = QET::GIOK;
 	return(true);
+}
+
+QString Element::layer() const
+{
+	return DrawingLayers::layerOf(this);
+}
+
+void Element::setLayer(const QString &layer)
+{
+	const QString clean = layer.trimmed();
+	if (DrawingLayers::layerOf(this) == clean) return;
+	DrawingLayers::setLayerOf(this, clean);
+	if (diagram() && diagram()->project()) {
+		if (!clean.isEmpty() && !diagram()->project()->drawingLayers().contains(clean)) {
+			DrawingLayers::Set set = diagram()->project()->drawingLayers();
+			if (DrawingLayers::ensureLayer(set, clean, true)) {
+				diagram()->project()->setDrawingLayers(set);
+			}
+		}
+		DrawingLayers::apply(this, diagram()->project()->drawingLayers());
+	}
 }
 
 /**
@@ -1780,6 +1809,7 @@ QDomElement Element::toXml(
 		//a T-junction drawn as a dot; left out otherwise
 	if (m_shown_as_dot)
 		element.setAttribute(QStringLiteral("shownAsDot"), QStringLiteral("true"));
+	DrawingLayers::writeAttribute(this, element);
 
 		// sequential num
 	QDomElement seq = m_autoNum_seq.toXml(document);

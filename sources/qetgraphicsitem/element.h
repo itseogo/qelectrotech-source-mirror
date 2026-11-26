@@ -56,6 +56,7 @@ class Element : public QetGraphicsItem
 	Q_PROPERTY(bool verticalMirror READ hasVerticalMirror WRITE setVerticalMirror NOTIFY mirrorChanged)
 	Q_PROPERTY(QVariantMap potentialSources READ potentialSourcesMap WRITE setPotentialSourcesMap)
 	Q_PROPERTY(bool shownAsDot READ isShownAsDot WRITE setShownAsDot)
+	Q_PROPERTY(QString layer READ layer WRITE setLayer)
 
 	public:
 			/**
@@ -181,6 +182,8 @@ class Element : public QetGraphicsItem
 		QVariantMap potentialSourcesMap() const;
 		void setPotentialSourcesMap(const QVariantMap &sources);
 		void setMovable(bool movable) override;
+		QString layer() const;
+		void setLayer(const QString &layer);
 		//@kind_information_ is used to store more information
 		//about the herited class like contactelement for know
 		// kind of contact (simple tempo) or number of contact show by the element.

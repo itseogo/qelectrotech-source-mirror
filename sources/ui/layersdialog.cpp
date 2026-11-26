@@ -832,6 +832,14 @@ void LayersDialog::showLayerItems()
 				}
 				if (detail.isEmpty()) detail = tr("Cross-reference");
 			}
+			else if (auto* el = qgraphicsitem_cast<Element*>(item))
+			{
+				type_label = tr("Symbol");
+				detail = el->elementInformations()[QStringLiteral("label")]
+							 .toString()
+							 .trimmed();
+				if (detail.isEmpty()) detail = el->name();
+			}
 			else if (auto* dt = dynamic_cast<DiagramTextItem*>(item))
 			{
 				type_label = tr("Text");

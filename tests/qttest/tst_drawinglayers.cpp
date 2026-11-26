@@ -15,6 +15,7 @@
 	You should have received a copy of the GNU General Public License
 	along with QElectroTech.  If not, see <http://www.gnu.org/licenses/>.
 */
+#include "ElementsCollection/xmlelementcollection.h"
 #include "dataBase/projectdatabase.h"
 #include "diagram.h"
 #include "drawinglayers/drawinglayers.h"
@@ -1012,6 +1013,78 @@ class tst_drawinglayers : public QObject
 			QVERIFY(groups_content->isHidden());
 			groups_toggle->setChecked(true);
 			QVERIFY(! groups_content->isHidden());
+		}
+
+		// Symbol (Element) default_layer from .elmt definition, auto-creation,
+		// visibility, locking, and listing in LayersDialog
+		{
+			QDomDocument elmt_doc;
+			QVERIFY(elmt_doc.setContent(QStringLiteral(
+				"<definition type=\"element\" width=\"20\" height=\"20\" "
+				"hotspot_x=\"10\" hotspot_y=\"10\" link_type=\"simple\" "
+				"default_layer=\"EDV\">"
+				"<names><name lang=\"en\">Network Socket</name></names>"
+				"<description><rect x=\"-5\" y=\"-5\" width=\"10\" height=\"10\"/></description>"
+				"</definition>")));
+
+			ElementData parsed_data;
+			QVERIFY(parsed_data.fromXml(elmt_doc.documentElement()));
+			QCOMPARE(parsed_data.m_default_layer, QStringLiteral("EDV"));
+
+			QETProject el_project;
+			Diagram*   el_folio = el_project.addNewDiagram();
+			QVERIFY(el_project.embeddedElementCollection()->addElementDefinition(
+				QStringLiteral("import"),
+				QStringLiteral("edv_socket.elmt"),
+				elmt_doc.documentElement()));
+			int build_state = 0;
+			ElementsLocation loc(
+				QStringLiteral("embed://import/edv_socket.elmt"),
+				&el_project);
+			auto* sym = new Element(loc, nullptr, &build_state);
+			QCOMPARE(build_state, 0);
+			QCOMPARE(sym->layer(), QStringLiteral("EDV"));
+			QVERIFY(DrawingLayers::canBeOnLayer(sym));
+
+			el_folio->addItem(sym);
+			QVERIFY(el_project.drawingLayers().contains(QStringLiteral("EDV")));
+			QVERIFY(sym->isVisible());
+
+			// Hide and lock the EDV layer
+			DrawingLayers::Set edv_set = el_project.drawingLayers();
+			for (auto& l : edv_set.layers)
+			{
+				if (l.name == QStringLiteral("EDV"))
+				{
+					l.visible = false;
+					l.locked  = true;
+				}
+			}
+			el_project.setDrawingLayers(edv_set);
+			QVERIFY(! sym->isVisible());
+			QVERIFY(DrawingLayers::isLocked(sym));
+			QCOMPARE(DrawingLayers::lockedLayerOf(sym), QStringLiteral("EDV"));
+
+			// LayersDialog shows the symbol under layer EDV
+			LayersDialog el_dialog(&el_project);
+			auto* layers_tbl =
+				el_dialog.findChild<QTableWidget*>(QStringLiteral("layersTable"));
+			auto* items_tbl =
+				el_dialog.findChild<QTableWidget*>(QStringLiteral("layerItemsTable"));
+			QVERIFY(layers_tbl);
+			QVERIFY(items_tbl);
+			bool selected_edv = false;
+			for (int r = 0; r < layers_tbl->rowCount(); ++r)
+			{
+				if (layers_tbl->item(r, 0)->text() == QStringLiteral("EDV"))
+				{
+					layers_tbl->selectRow(r);
+					selected_edv = true;
+					break;
+				}
+			}
+			QVERIFY(selected_edv);
+			QCOMPARE(items_tbl->rowCount(), 1);
 		}
 	}
 };
