@@ -44,6 +44,7 @@
 #include <QPrinter>
 #include <QTableWidget>
 #include <QTemporaryDir>
+#include <QToolButton>
 #include <QUndoStack>
 #include <QtTest>
 
@@ -901,6 +902,9 @@ class tst_drawinglayers : public QObject
 		}
 		project.setDrawingLayers(locked_set);
 		QVERIFY(DrawingLayers::isLocked(&locked_text));
+		QCOMPARE(
+			DrawingLayers::lockedLayerOf(&locked_text),
+			QStringLiteral("50"));
 		QVERIFY(! (locked_text.flags() & QGraphicsItem::ItemIsMovable));
 		QVERIFY(! (locked_text.flags() & QGraphicsItem::ItemIsSelectable));
 
@@ -996,6 +1000,18 @@ class tst_drawinglayers : public QObject
 
 			QVERIFY(selectLayerRow(QStringLiteral("CustomNotes")));
 			QCOMPARE(items_table->rowCount(), 1);
+
+			// Layer groups section is collapsed by default and toggles open
+			auto* groups_toggle = nav_dialog.findChild<QToolButton*>(
+				QStringLiteral("layerGroupsToggle"));
+			auto* groups_content = nav_dialog.findChild<QWidget*>(
+				QStringLiteral("layerGroupsContent"));
+			QVERIFY(groups_toggle);
+			QVERIFY(groups_content);
+			QVERIFY(! groups_toggle->isChecked());
+			QVERIFY(groups_content->isHidden());
+			groups_toggle->setChecked(true);
+			QVERIFY(! groups_content->isHidden());
 		}
 	}
 };

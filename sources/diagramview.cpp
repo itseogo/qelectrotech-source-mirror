@@ -72,6 +72,7 @@
 #include "ui/multipastedialog.h"
 #include "undocommand/addgraphicsobjectcommand.h"
 #include "undocommand/changetitleblockcommand.h"
+#include "drawinglayers/drawinglayers.h"
 #include "undocommand/drawinglayerscommand.h"
 #include "utils/colordialogdoubleclick.h"
 #include "utils/conductorcreator.h"
@@ -1528,6 +1529,12 @@ void DiagramView::mousePressEvent(QMouseEvent* original)
 void DiagramView::leaveEvent(QEvent* event)
 {
 	setPointedDescription(QString());
+	if (m_locked_hover_visible)
+	{
+		m_locked_hover_visible = false;
+		m_locked_hover_layer.clear();
+		viewport()->update();
+	}
 	QGraphicsView::leaveEvent(event);
 }
 
@@ -1706,6 +1713,121 @@ void DiagramView::mouseMoveEvent(QMouseEvent* original)
 	else
 		QGraphicsView::mouseMoveEvent(e);
 	updatePointer(e->pos(), e->buttons());
+	updateLockedHover(e->pos());
+}
+
+void DiagramView::updateLockedHover(const QPoint& viewport_pos)
+{
+	QString found_layer;
+	if (! m_event_interface && m_diagram && m_diagram->project())
+	{
+		for (QGraphicsItem* item : items(viewport_pos))
+		{
+			if (! item || ! item->isVisible()) continue;
+			const QString locked = DrawingLayers::lockedLayerOf(item);
+			if (! locked.isEmpty())
+			{
+				found_layer = locked;
+				break;
+			}
+		}
+	}
+
+	const bool now_visible = ! found_layer.isEmpty();
+	if (now_visible)
+	{
+		const bool changed = ! m_locked_hover_visible
+							 || m_locked_hover_layer != found_layer
+							 || m_locked_hover_viewport_pos != viewport_pos;
+		m_locked_hover_visible		= true;
+		m_locked_hover_layer		= found_layer;
+		m_locked_hover_viewport_pos = viewport_pos;
+		if (changed) viewport()->update();
+	}
+	else if (m_locked_hover_visible)
+	{
+		m_locked_hover_visible = false;
+		m_locked_hover_layer.clear();
+		viewport()->update();
+	}
+}
+
+void DiagramView::drawLockedHoverBadge(QPainter* painter) const
+{
+	if (! m_locked_hover_visible || ! m_diagram || ! m_diagram->project())
+		return;
+
+	const QString desc =
+		m_diagram->project()->drawingLayers().description(m_locked_hover_layer);
+	const QString label =
+		desc.isEmpty() ?
+			m_locked_hover_layer :
+			QStringLiteral("%1 - %2").arg(m_locked_hover_layer, desc);
+
+	painter->save();
+	painter->resetTransform();
+	painter->setRenderHint(QPainter::Antialiasing, true);
+
+	QFont font = painter->font();
+	font.setPointSize(8);
+	font.setBold(true);
+	painter->setFont(font);
+	const QFontMetrics fm(font);
+
+	const int icon_w = 14;
+	const int pad_x	 = 6;
+	const int pad_y	 = 4;
+	const int gap	 = 5;
+	const int text_w = fm.horizontalAdvance(label);
+	const int badge_w = pad_x + icon_w + gap + text_w + pad_x;
+	const int badge_h = qMax(22, fm.height() + pad_y * 2);
+
+	const QRect vp = viewport()->rect();
+	int			bx = m_locked_hover_viewport_pos.x() + 14;
+	int			by = m_locked_hover_viewport_pos.y() - badge_h - 6;
+	if (bx + badge_w > vp.right() - 4)
+		bx = qMax(4, m_locked_hover_viewport_pos.x() - badge_w - 10);
+	if (by < vp.top() + 4)
+		by = qMin(vp.bottom() - badge_h - 4,
+				  m_locked_hover_viewport_pos.y() + 18);
+
+	const QRectF badge_rect(bx, by, badge_w, badge_h);
+
+	// Background pill
+	painter->setPen(QPen(QColor(180, 120, 20), 1.2));
+	painter->setBrush(QColor(255, 248, 225, 240));
+	painter->drawRoundedRect(badge_rect, 4.0, 4.0);
+
+	// Closed padlock icon
+	const qreal lx = bx + pad_x + 1.0;
+	const qreal ly = by + (badge_h - 14.0) * 0.5;
+
+	// Shackle (closed arch)
+	painter->setPen(QPen(QColor(70, 70, 70), 1.6));
+	painter->setBrush(Qt::NoBrush);
+	painter->drawArc(QRectF(lx + 2.5, ly + 0.5, 7.0, 7.5), 0, 180 * 16);
+	painter->drawLine(QPointF(lx + 2.5, ly + 4.2), QPointF(lx + 2.5, ly + 6.5));
+	painter->drawLine(QPointF(lx + 9.5, ly + 4.2), QPointF(lx + 9.5, ly + 6.5));
+
+	// Lock body
+	painter->setPen(QPen(QColor(150, 95, 10), 1.0));
+	painter->setBrush(QColor(235, 175, 45));
+	painter->drawRoundedRect(QRectF(lx + 0.5, ly + 6.0, 11.0, 7.5), 1.5, 1.5);
+
+	// Keyhole
+	painter->setPen(Qt::NoPen);
+	painter->setBrush(QColor(60, 40, 10));
+	painter->drawEllipse(QPointF(lx + 6.0, ly + 9.2), 1.2, 1.2);
+	painter->drawRect(QRectF(lx + 5.4, ly + 9.8, 1.2, 2.2));
+
+	// Layer text
+	painter->setPen(QColor(50, 35, 10));
+	painter->drawText(
+		QRectF(bx + pad_x + icon_w + gap, by, text_w + 2, badge_h),
+		Qt::AlignVCenter | Qt::AlignLeft,
+		label);
+
+	painter->restore();
 }
 
 /**
@@ -3229,6 +3351,7 @@ void DiagramView::drawForeground(QPainter* painter, const QRectF& rect)
 		rp->drawEllipse(terminal->dockConductor(), 4.0, 4.0);
 		rp->restore();
 	}
+	if (m_locked_hover_visible) { drawLockedHoverBadge(painter); }
 	if (! m_crosshair_visible || ! crosshairShown() || ! m_diagram) return;
 
 	const QRectF area = m_diagram->border_and_titleblock.insideBorderRect();
@@ -3950,10 +4073,73 @@ void DiagramView::contextMenuEvent(QContextMenuEvent* e)
 		updateFolioReportMenu();
 	}
 
+	QString locked_layer_at_click;
+	if (! from_keyboard && m_diagram && m_diagram->project()
+		&& ! m_diagram->isReadOnly())
+	{
+		for (QGraphicsItem* item : items(menu_pos))
+		{
+			if (! item || ! item->isVisible()) continue;
+			const QString locked = DrawingLayers::lockedLayerOf(item);
+			if (! locked.isEmpty())
+			{
+				locked_layer_at_click = locked;
+				break;
+			}
+		}
+	}
+
 	QList<QAction*> list = contextMenuActions();
-	if (! list.isEmpty())
+	if (! list.isEmpty() || ! locked_layer_at_click.isEmpty())
 	{
 		QMenu* context_menu = new QMenu(this);
+		context_menu->setAttribute(Qt::WA_DeleteOnClose);
+		if (! locked_layer_at_click.isEmpty())
+		{
+			QETProject*	  project = m_diagram->project();
+			const QString desc =
+				project->drawingLayers().description(locked_layer_at_click);
+			const QString display =
+				desc.isEmpty() ?
+					locked_layer_at_click :
+					QStringLiteral("%1 - %2")
+						.arg(locked_layer_at_click, desc);
+			QAction* unlock_action = context_menu->addAction(
+				QET::Icons::ObjectUnlocked,
+				tr("Unlock layer \"%1\"").arg(display));
+			connect(
+				unlock_action,
+				&QAction::triggered,
+				this,
+				[this, project, locked_layer_at_click]()
+				{
+					if (! project) return;
+					DrawingLayers::Set			   set = project->drawingLayers();
+					const DrawingLayers::FixedKind fk =
+						DrawingLayers::fixedKindOf(locked_layer_at_click);
+					for (auto& l : set.layers)
+					{
+						if (l.name == locked_layer_at_click
+							|| (fk != DrawingLayers::FixedKind::None
+								&& l.fixed_kind == fk))
+						{
+							l.locked = false;
+						}
+					}
+					if (set != project->drawingLayers())
+					{
+						project->undoStack()->push(
+							new DrawingLayersCommand(project, set));
+					}
+					if (m_locked_hover_visible)
+					{
+						m_locked_hover_visible = false;
+						m_locked_hover_layer.clear();
+						viewport()->update();
+					}
+				});
+			if (! list.isEmpty()) context_menu->addSeparator();
+		}
 		context_menu->addActions(list);
 		context_menu->popup(menu_global_pos);
 		e->accept();

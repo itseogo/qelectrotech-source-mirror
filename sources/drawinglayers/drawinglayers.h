@@ -158,9 +158,10 @@ namespace DrawingLayers
 	void	writeAttribute(const QGraphicsItem* item, QDomElement& element);
 	void	readAttribute(QGraphicsItem* item, const QDomElement& element);
 
-	bool canBeOnLayer(const QGraphicsItem* item);
-	bool isHidden(const QGraphicsItem* item);
-	bool isLocked(const QGraphicsItem* item);
+	bool	canBeOnLayer(const QGraphicsItem* item);
+	bool	isHidden(const QGraphicsItem* item);
+	QString lockedLayerOf(const QGraphicsItem* item);
+	bool	isLocked(const QGraphicsItem* item);
 	void apply(QGraphicsItem* item, const Set& set);
 	void applyTo(Diagram* folio, const Set& set);
 

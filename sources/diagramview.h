@@ -121,6 +121,11 @@ class DiagramView : public PaletteGraphicsView
 		bool              m_pointer_set = false;
 		void updatePointer(const QPoint &viewport_pos, Qt::MouseButtons buttons);
 		void drawPointer(QPainter *painter) const;
+		bool    m_locked_hover_visible = false;
+		QPoint  m_locked_hover_viewport_pos;
+		QString m_locked_hover_layer;
+		void updateLockedHover(const QPoint &viewport_pos);
+		void drawLockedHoverBadge(QPainter *painter) const;
 		QPointF           m_drag_last_pos;
 		QPoint            m_band_origin;
 		void updateRubberBandMode(const QPoint &viewport_pos);

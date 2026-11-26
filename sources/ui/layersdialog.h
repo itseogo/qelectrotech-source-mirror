@@ -30,6 +30,7 @@ class QListWidget;
 class QTableWidget;
 
 class QLineEdit;
+class QToolButton;
 
 /**
 	@brief The LayersDialog class
@@ -89,6 +90,8 @@ class LayersDialog : public QDialog
 	QList<LayerItemEntry> m_item_entries;
 	QListWidget*		  m_groups;
 	QListWidget*		  m_members;
+	QToolButton*		  m_groups_toggle  = nullptr;
+	QWidget*			  m_groups_content = nullptr;
 	QLabel*				  m_summary;
 	QPushButton*		  m_rename_btn = nullptr;
 	QPushButton*		  m_remove_btn = nullptr;

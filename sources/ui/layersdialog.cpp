@@ -33,6 +33,7 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QTableWidget>
+#include <QToolButton>
 #include <QUndoStack>
 #include <QVBoxLayout>
 #include <dataBase/projectdatabase.h>
@@ -202,6 +203,7 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 	m_layer_items->setSelectionBehavior(QAbstractItemView::SelectRows);
 	m_layer_items->setSelectionMode(QAbstractItemView::SingleSelection);
 	m_layer_items->setEditTriggers(QAbstractItemView::NoEditTriggers);
+	m_layer_items->setContextMenuPolicy(Qt::CustomContextMenu);
 	m_layer_items->horizontalHeader()->setSectionResizeMode(
 		0,
 		QHeaderView::ResizeToContents);
@@ -212,11 +214,27 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 		2,
 		QHeaderView::Stretch);
 	items_layout->addWidget(m_layer_items);
-	layout->addWidget(m_items_box, 1);
+	layout->addWidget(m_items_box, 2);
 
-	auto* groups_box =
-		new QGroupBox(tr("Layer groups: the layers to show together"), this);
-	auto* groups_layout = new QHBoxLayout(groups_box);
+	auto* groups_container = new QWidget(this);
+	auto* groups_vbox	   = new QVBoxLayout(groups_container);
+	groups_vbox->setContentsMargins(0, 0, 0, 0);
+	groups_vbox->setSpacing(4);
+
+	m_groups_toggle = new QToolButton(this);
+	m_groups_toggle->setObjectName(QStringLiteral("layerGroupsToggle"));
+	m_groups_toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	m_groups_toggle->setArrowType(Qt::RightArrow);
+	m_groups_toggle->setText(tr("Layer groups: the layers to show together"));
+	m_groups_toggle->setCheckable(true);
+	m_groups_toggle->setChecked(false);
+	m_groups_toggle->setAutoRaise(true);
+	groups_vbox->addWidget(m_groups_toggle, 0, Qt::AlignLeft);
+
+	m_groups_content = new QWidget(this);
+	m_groups_content->setObjectName(QStringLiteral("layerGroupsContent"));
+	auto* groups_layout = new QHBoxLayout(m_groups_content);
+	groups_layout->setContentsMargins(0, 0, 0, 0);
 	m_groups->setObjectName(QStringLiteral("layerGroups"));
 	m_members->setObjectName(QStringLiteral("layerGroupMembers"));
 	groups_layout->addWidget(m_groups, 1);
@@ -228,7 +246,20 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 		button(group_buttons, tr("Show this group"), "groupShow");
 	group_buttons->addStretch();
 	groups_layout->addLayout(group_buttons);
-	layout->addWidget(groups_box, 1);
+	m_groups_content->setVisible(false);
+	groups_vbox->addWidget(m_groups_content);
+	layout->addWidget(groups_container, 0);
+
+	connect(
+		m_groups_toggle,
+		&QToolButton::toggled,
+		this,
+		[this](bool expanded)
+		{
+			m_groups_toggle->setArrowType(
+				expanded ? Qt::DownArrow : Qt::RightArrow);
+			m_groups_content->setVisible(expanded);
+		});
 
 	auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
 	connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -346,6 +377,24 @@ LayersDialog::LayersDialog(QETProject* project, QWidget* parent) :
 		&QTableWidget::cellDoubleClicked,
 		this,
 		[this](int row, int /*column*/) { navigateToLayerItem(row); });
+	connect(
+		m_layer_items,
+		&QWidget::customContextMenuRequested,
+		this,
+		[this](const QPoint& pos)
+		{
+			auto* item = m_layer_items->itemAt(pos);
+			if (! item) return;
+			const int row = item->row();
+			m_layer_items->selectRow(row);
+			QMenu menu(this);
+			auto* show_action = menu.addAction(tr("Show"));
+			if (menu.exec(m_layer_items->viewport()->mapToGlobal(pos))
+				== show_action)
+			{
+				navigateToLayerItem(row);
+			}
+		});
 	connect(
 		m_layers,
 		&QTableWidget::itemChanged,

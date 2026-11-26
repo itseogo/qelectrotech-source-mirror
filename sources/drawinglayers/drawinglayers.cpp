@@ -651,33 +651,43 @@ namespace DrawingLayers
 		return false;
 	}
 
-	bool isLocked(const QGraphicsItem* item)
+	QString lockedLayerOf(const QGraphicsItem* item)
 	{
-		if (! item) return false;
+		if (! item) return QString();
 		const Diagram* d = nullptr;
 		if (auto* scene = item->scene())
 		{
 			d = qobject_cast<const Diagram*>(scene);
 		}
-		if (! d || ! d->project()) return false;
+		if (! d || ! d->project()) return QString();
 		const Set& set = d->project()->drawingLayers();
 
 		for (const QGraphicsItem* p = item; p; p = p->parentItem())
 		{
 			const QString layer = layerOf(p);
-			if (! layer.isEmpty()) return set.isLocked(layer);
+			if (! layer.isEmpty())
+				return set.isLocked(layer) ? layer : QString();
 		}
 
 		const QVariant val = item->data(ShownKinds::data_key);
 		if (val.isValid())
 		{
 			const int kind = val.toInt();
-			if (kind == ShownKinds::WireNumbers) return set.isLocked(FixedKind::WireNumbers);
-			if (kind == ShownKinds::SymbolTexts) return set.isLocked(FixedKind::SymbolTexts);
-			if (kind == ShownKinds::CrossReferences) return set.isLocked(FixedKind::CrossReferences);
+			if (kind == ShownKinds::WireNumbers
+				&& set.isLocked(FixedKind::WireNumbers))
+				return fixedKindName(FixedKind::WireNumbers);
+			if (kind == ShownKinds::SymbolTexts
+				&& set.isLocked(FixedKind::SymbolTexts))
+				return fixedKindName(FixedKind::SymbolTexts);
+			if (kind == ShownKinds::CrossReferences
+				&& set.isLocked(FixedKind::CrossReferences))
+				return fixedKindName(FixedKind::CrossReferences);
 		}
-		return false;
+		return QString();
 	}
+
+	bool isLocked(const QGraphicsItem* item)
+	{ return ! lockedLayerOf(item).isEmpty(); }
 
 	/**
 		@brief apply
