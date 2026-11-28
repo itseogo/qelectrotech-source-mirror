@@ -248,6 +248,7 @@ class QETDiagramEditor : public QETMainWindow
 		void updateTextGridButton();
 		void updateGridStepButton();
 		void updateSelectionFilterButton();
+		void populateLayersStatusMenu();
 		void updateShownKinds();
 		void selectionChanged();
 
@@ -391,6 +392,8 @@ class QETDiagramEditor : public QETMainWindow
 		QAction *m_grid_snap = nullptr;			///< Snap to the grid, on or off
 		QMenu *m_grid_step_menu = nullptr;		///< Fine, medium or coarse grid
 		QToolButton *m_grid_step_button = nullptr;
+		QMenu *m_layers_status_menu = nullptr;		///< Status bar: quick layer visibility toggles and settings
+		QToolButton *m_layers_status_button = nullptr;	///< Status bar: Layers button beside the selection filter
 		QMenu *m_selection_filter_menu = nullptr;	///< What a click, a selection rectangle and Select All pick
 		QToolButton *m_selection_filter_button = nullptr;	///< Status bar: the selection filter, with the same menu
 		QToolButton *m_grid_status_button = nullptr;	///< Status bar: the grid step, with the same menu

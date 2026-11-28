@@ -36,6 +36,8 @@
 #include <QTemporaryDir>
 #include <QCoreApplication>
 #include <QToolButton>
+#include <QCheckBox>
+#include <QScrollArea>
 #include <QWidgetAction>
 #include <QGridLayout>
 #include "ElementsCollection/elementscollectionwidget.h"
@@ -103,6 +105,8 @@
 #include "ui/duplicatelabelsdialog.h"
 #include "ui/devicetypecheckdialog.h"
 #include "ui/devicetypesdialog.h"
+#include "drawinglayers/drawinglayers.h"
+#include "undocommand/drawinglayerscommand.h"
 #include "ui/layersdialog.h"
 #include "materiallist/materiallist.h"
 #include "ui/parttypesdialog.h"
@@ -1183,6 +1187,19 @@ void QETDiagramEditor::setUpActions()
 			updateSelectionFilterButton();
 		});
 	}
+	m_layers_status_menu = new QMenu(tr("Layers"), this);
+	m_layers_status_menu->setObjectName(QStringLiteral("layers_status_menu"));
+	connect(m_layers_status_menu, &QMenu::aboutToShow, this, &QETDiagramEditor::populateLayersStatusMenu);
+	m_layers_status_button = new QToolButton(this);
+	m_layers_status_button->setObjectName(QStringLiteral("layers_status_button"));
+	m_layers_status_button->setText(tr("Layers"));
+	m_layers_status_button->setMenu(m_layers_status_menu);
+	m_layers_status_button->setPopupMode(QToolButton::InstantPopup);
+	m_layers_status_button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+	m_layers_status_button->setAutoRaise(true);
+	m_layers_status_button->setToolTip(tr("Show or hide drawing layers, or open layer settings"));
+	statusBar()->addPermanentWidget(m_layers_status_button);
+
 	m_selection_filter_button = new QToolButton(this);
 	m_selection_filter_button->setMenu(m_selection_filter_menu);
 	m_selection_filter_button->setPopupMode(QToolButton::InstantPopup);
@@ -4124,6 +4141,7 @@ void QETDiagramEditor::slot_updateActions()
 	m_device_types->setEnabled(opened_project);
 	m_check_device_types->setEnabled(opened_project);
 	m_layers->setEnabled(opened_project);
+	if (m_layers_status_button) m_layers_status_button->setEnabled(opened_project);
 	m_part_types->setEnabled(opened_project);
 	m_reports->setEnabled(opened_project);
 	m_plants_locations->setEnabled(opened_project);
@@ -6377,6 +6395,87 @@ void QETDiagramEditor::updateSelectionFilterButton()
 		}
 	}
 	m_selection_filter_button->setText(tr("Select: %1").arg(name));
+}
+
+/**
+	@brief QETDiagramEditor::populateLayersStatusMenu
+	Rebuild the status-bar Layers popup with live visibility checkboxes
+	for every layer of the active project and a button to open LayersDialog.
+*/
+void QETDiagramEditor::populateLayersStatusMenu()
+{
+	if (!m_layers_status_menu) return;
+	m_layers_status_menu->clear();
+
+	ProjectView *view = currentProjectView();
+	QETProject *project = view ? view->project() : nullptr;
+	if (!project) return;
+
+	const DrawingLayers::Set &layers_set = project->drawingLayers();
+
+	auto *list_widget = new QWidget(m_layers_status_menu);
+	auto *list_layout = new QVBoxLayout(list_widget);
+	list_layout->setContentsMargins(6, 4, 6, 4);
+	list_layout->setSpacing(2);
+
+	QPointer<QETProject> proj_ptr(project);
+	for (const DrawingLayers::Layer &l : layers_set.layers) {
+		auto *row_widget = new QWidget(list_widget);
+		auto *row_layout = new QHBoxLayout(row_widget);
+		row_layout->setContentsMargins(2, 1, 2, 1);
+		row_layout->setSpacing(6);
+
+		auto *swatch = new QLabel(row_widget);
+		swatch->setFixedSize(12, 12);
+		const QColor c = l.color.isValid() ? l.color : QColor(Qt::black);
+		swatch->setStyleSheet(
+			QStringLiteral("background-color: %1; border: 1px solid #666666; border-radius: 2px;")
+				.arg(c.name()));
+		row_layout->addWidget(swatch);
+
+		const QString label = l.description.isEmpty()
+			? l.name
+			: QStringLiteral("%1 - %2").arg(l.name, l.description);
+		auto *cb = new QCheckBox(label, row_widget);
+		cb->setChecked(l.visible);
+		const QString layer_name = l.name;
+		connect(cb, &QCheckBox::toggled, this, [proj_ptr, layer_name](bool checked) {
+			if (!proj_ptr) return;
+			DrawingLayers::Set set = proj_ptr->drawingLayers();
+			for (auto &layer : set.layers) {
+				if (layer.name == layer_name) {
+					layer.visible = checked;
+					break;
+				}
+			}
+			if (set != proj_ptr->drawingLayers()) {
+				proj_ptr->undoStack()->push(new DrawingLayersCommand(proj_ptr, set));
+			}
+		});
+		row_layout->addWidget(cb, 1);
+		list_layout->addWidget(row_widget);
+	}
+
+	auto *widget_action = new QWidgetAction(m_layers_status_menu);
+	if (layers_set.layers.size() > 12) {
+		auto *scroll = new QScrollArea(m_layers_status_menu);
+		scroll->setFrameShape(QFrame::NoFrame);
+		scroll->setWidgetResizable(true);
+		scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+		scroll->setWidget(list_widget);
+		scroll->setFixedHeight(300);
+		scroll->setMinimumWidth(list_widget->sizeHint().width() + 24);
+		widget_action->setDefaultWidget(scroll);
+	} else {
+		widget_action->setDefaultWidget(list_widget);
+	}
+	m_layers_status_menu->addAction(widget_action);
+
+	m_layers_status_menu->addSeparator();
+	QAction *settings_action = m_layers_status_menu->addAction(tr("Layer settings..."));
+	connect(settings_action, &QAction::triggered, this, [this]() {
+		if (m_layers) m_layers->trigger();
+	});
 }
 
 /**
