@@ -161,6 +161,9 @@ class ProjectMainConfigPage : public ProjectConfigPage {
 	QLabel *wiring_rules_off_label_;
 	QLabel *origin_label_;
 	QComboBox *origin_cb_;
+	QLabel *m_missing_layer_label = nullptr;
+	QComboBox *m_missing_layer_policy_cb = nullptr;
+	QComboBox *m_missing_layer_fallback_cb = nullptr;
 };
 
 class ProjectAutoNumConfigPage : public ProjectConfigPage {

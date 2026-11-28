@@ -44,6 +44,13 @@ class LayersDialog : public QDialog
   public:
 	explicit LayersDialog(QETProject* project, QWidget* parent = nullptr);
 
+	/// Resolve an unknown layer requested by a newly placed symbol according
+	/// to the project's MissingLayerPolicy (prompting once if policy is Ask).
+	static QString resolveMissingLayer(
+		QETProject*	   project,
+		const QString& layer_name,
+		QWidget*	   parent = nullptr);
+
   public slots:
 	void refresh();
 	bool addLayer(const QString& name, const QString& description = QString());

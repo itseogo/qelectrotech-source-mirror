@@ -43,6 +43,7 @@
 #include <ui/titleblockpropertieswidget.h>
 #include <ui/xrefpropertieswidget.h>
 #include <projectorigin.h>
+#include <drawinglayers/drawinglayers.h>
 
 //#include "ui_autonumberingmanagementw.h"
 
@@ -193,6 +194,23 @@ void ProjectMainConfigPage::applyProjectConf()
 	{
 		m_project->setOrigin(project_origin);
 		modified_project = true;
+	}
+
+	if (m_missing_layer_policy_cb) {
+		DrawingLayers::Set dlayers = m_project->drawingLayers();
+		const auto wanted_policy = static_cast<DrawingLayers::MissingLayerPolicy>(
+			m_missing_layer_policy_cb->currentData().toInt());
+		const QString wanted_fallback =
+			(wanted_policy == DrawingLayers::MissingLayerPolicy::UseExisting && m_missing_layer_fallback_cb)
+				? m_missing_layer_fallback_cb->currentData().toString()
+				: QString();
+		if (dlayers.missing_layer_policy != wanted_policy ||
+			dlayers.missing_layer_fallback != wanted_fallback) {
+			dlayers.missing_layer_policy = wanted_policy;
+			dlayers.missing_layer_fallback = wanted_fallback;
+			m_project->setDrawingLayers(dlayers);
+			modified_project = true;
+		}
 	}
 
 	if (m_project -> uprightSymbolTexts() != upright_symbol_texts_cb_ -> isChecked()) {
@@ -443,6 +461,35 @@ void ProjectMainConfigPage::initWidgets()
 							  "Bottom - Left, Bottom - Right.",
 							  "tooltip"));
 
+	// Policy when placing a symbol whose default layer does not exist in this project
+	m_missing_layer_label = new QLabel(tr("Unknown symbol layer:", "label when configuring"));
+	m_missing_layer_policy_cb = new QComboBox();
+	m_missing_layer_policy_cb->setObjectName(QStringLiteral("missingLayerPolicy"));
+	m_missing_layer_policy_cb->addItem(
+		tr("Ask every time"),
+		static_cast<int>(DrawingLayers::MissingLayerPolicy::Ask));
+	m_missing_layer_policy_cb->addItem(
+		tr("Create new layer automatically"),
+		static_cast<int>(DrawingLayers::MissingLayerPolicy::AutoCreate));
+	m_missing_layer_policy_cb->addItem(
+		tr("Assign to existing layer:"),
+		static_cast<int>(DrawingLayers::MissingLayerPolicy::UseExisting));
+	m_missing_layer_policy_cb->addItem(
+		tr("Place without a layer"),
+		static_cast<int>(DrawingLayers::MissingLayerPolicy::NoLayer));
+	m_missing_layer_policy_cb->setToolTip(
+		tr("Controls what happens when a symbol with a default layer is placed "
+		   "and that layer does not exist in this project yet."));
+	m_missing_layer_fallback_cb = new QComboBox();
+	m_missing_layer_fallback_cb->setObjectName(QStringLiteral("missingLayerFallback"));
+	connect(m_missing_layer_policy_cb, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, [this]() {
+		const bool use_existing =
+			static_cast<DrawingLayers::MissingLayerPolicy>(m_missing_layer_policy_cb->currentData().toInt())
+			== DrawingLayers::MissingLayerPolicy::UseExisting;
+		m_missing_layer_fallback_cb->setVisible(use_existing);
+		m_missing_layer_fallback_cb->setEnabled(use_existing && (!m_project || !m_project->isReadOnly()));
+	});
 }
 
 /**
@@ -524,6 +571,14 @@ void ProjectMainConfigPage::initLayout()
 	main_layout0->addLayout(project_origin_layout0);
 	main_layout0->addSpacing(10);
 
+	QHBoxLayout* missing_layer_layout = new QHBoxLayout();
+	missing_layer_layout->addWidget(m_missing_layer_label);
+	missing_layer_layout->addWidget(m_missing_layer_policy_cb);
+	missing_layer_layout->addWidget(m_missing_layer_fallback_cb);
+	missing_layer_layout->addStretch();
+	main_layout0->addLayout(missing_layer_layout);
+	main_layout0->addSpacing(10);
+
 	setLayout(main_layout0);
 	this -> setMinimumWidth(680);
 
@@ -565,6 +620,34 @@ void ProjectMainConfigPage::readValuesFromProject()
 
 	const int project_origin_index = origin_cb_->findData(ProjectOrigin::toString(m_project->origin()));
 	origin_cb_->setCurrentIndex(qMax(0, project_origin_index));
+
+	if (m_missing_layer_policy_cb && m_missing_layer_fallback_cb) {
+		const DrawingLayers::Set &dlayers = m_project->drawingLayers();
+		m_missing_layer_fallback_cb->clear();
+		for (const auto &choice : DrawingLayers::availableLayerChoices(dlayers)) {
+			const DrawingLayers::FixedKind fk = DrawingLayers::fixedKindOf(choice.first);
+			if (fk == DrawingLayers::FixedKind::FrameAndTitleBlock ||
+				fk == DrawingLayers::FixedKind::WireNumbers ||
+				fk == DrawingLayers::FixedKind::SymbolTexts ||
+				fk == DrawingLayers::FixedKind::CrossReferences) {
+				continue;
+			}
+			const QString label = choice.second.isEmpty()
+				? choice.first
+				: QStringLiteral("%1 - %2").arg(choice.first, choice.second);
+			m_missing_layer_fallback_cb->addItem(label, choice.first);
+		}
+		const int fb_idx = m_missing_layer_fallback_cb->findData(dlayers.missing_layer_fallback);
+		if (fb_idx >= 0) m_missing_layer_fallback_cb->setCurrentIndex(fb_idx);
+
+		const int pol_idx = m_missing_layer_policy_cb->findData(
+			static_cast<int>(dlayers.missing_layer_policy));
+		m_missing_layer_policy_cb->setCurrentIndex(qMax(0, pol_idx));
+		const bool use_existing =
+			dlayers.missing_layer_policy == DrawingLayers::MissingLayerPolicy::UseExisting;
+		m_missing_layer_fallback_cb->setVisible(use_existing);
+		m_missing_layer_fallback_cb->setEnabled(use_existing && !m_project->isReadOnly());
+	}
 
 		//The rules that apply: the project's own or the application's
 	const WiringRules::Settings wiring_rules = m_project -> wiringRules();
@@ -629,6 +712,13 @@ void ProjectMainConfigPage::adjustReadOnly()
 	terminal_label_gb_ -> setDisabled(is_read_only);
 	wiring_rules_gb_ -> setDisabled(is_read_only);
 	origin_cb_->setDisabled(is_read_only);
+	if (m_missing_layer_policy_cb) m_missing_layer_policy_cb->setDisabled(is_read_only);
+	if (m_missing_layer_fallback_cb) {
+		const bool use_existing = m_missing_layer_policy_cb &&
+			static_cast<DrawingLayers::MissingLayerPolicy>(m_missing_layer_policy_cb->currentData().toInt())
+			== DrawingLayers::MissingLayerPolicy::UseExisting;
+		m_missing_layer_fallback_cb->setDisabled(is_read_only || !use_existing);
+	}
 }
 
 //######################################################################################//

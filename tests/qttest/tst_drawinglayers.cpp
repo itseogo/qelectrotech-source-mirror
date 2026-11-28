@@ -1111,6 +1111,42 @@ class tst_drawinglayers : public QObject
 			}
 			QVERIFY(selected_edv);
 			QCOMPARE(items_tbl->rowCount(), 1);
+
+			// MissingLayerPolicy XML round-trip & policy behavior
+			{
+				DrawingLayers::Set policy_set;
+				policy_set.missing_layer_policy =
+					DrawingLayers::MissingLayerPolicy::UseExisting;
+				policy_set.missing_layer_fallback = QStringLiteral("70");
+				QDomDocument pdoc;
+				const DrawingLayers::Set roundtrip =
+					DrawingLayers::Set::fromXml(policy_set.toXml(pdoc));
+				QCOMPARE(
+					roundtrip.missing_layer_policy,
+					DrawingLayers::MissingLayerPolicy::UseExisting);
+				QCOMPARE(
+					roundtrip.missing_layer_fallback,
+					QStringLiteral("70"));
+
+				QETProject pol_proj;
+				pol_proj.setDrawingLayers(policy_set);
+				QCOMPARE(
+					LayersDialog::resolveMissingLayer(
+						&pol_proj,
+						QStringLiteral("110")),
+					QStringLiteral("70"));
+				QVERIFY(! pol_proj.drawingLayers().contains(
+					QStringLiteral("110")));
+
+				policy_set.missing_layer_policy =
+					DrawingLayers::MissingLayerPolicy::NoLayer;
+				pol_proj.setDrawingLayers(policy_set);
+				QCOMPARE(
+					LayersDialog::resolveMissingLayer(
+						&pol_proj,
+						QStringLiteral("110")),
+					QString());
+			}
 		}
 	}
 };

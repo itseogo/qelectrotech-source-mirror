@@ -291,6 +291,31 @@ namespace DrawingLayers
 			 FixedKind::Building}};
 	}
 
+	QString missingLayerPolicyToString(MissingLayerPolicy policy)
+	{
+		switch (policy)
+		{
+		case MissingLayerPolicy::AutoCreate:
+			return QStringLiteral("auto_create");
+		case MissingLayerPolicy::UseExisting:
+			return QStringLiteral("use_existing");
+		case MissingLayerPolicy::NoLayer: return QStringLiteral("no_layer");
+		case MissingLayerPolicy::Ask:
+		default: return QStringLiteral("ask");
+		}
+	}
+
+	MissingLayerPolicy missingLayerPolicyFromString(const QString& value)
+	{
+		if (value == QLatin1String("auto_create"))
+			return MissingLayerPolicy::AutoCreate;
+		if (value == QLatin1String("use_existing"))
+			return MissingLayerPolicy::UseExisting;
+		if (value == QLatin1String("no_layer"))
+			return MissingLayerPolicy::NoLayer;
+		return MissingLayerPolicy::Ask;
+	}
+
 	Set::Set() { ensureFixedLayers(); }
 
 	void Set::ensureFixedLayers()
@@ -334,6 +359,7 @@ namespace DrawingLayers
 
 	bool Set::isEmpty() const
 	{
+		if (missing_layer_policy != MissingLayerPolicy::Ask) return false;
 		if (! groups.isEmpty()) return false;
 		if (! userLayers().isEmpty()) return false;
 		for (const Layer& layer : layers)
@@ -506,6 +532,19 @@ namespace DrawingLayers
 	QDomElement Set::toXml(QDomDocument& document) const
 	{
 		QDomElement root = document.createElement(QStringLiteral("layers"));
+		if (missing_layer_policy != MissingLayerPolicy::Ask)
+		{
+			root.setAttribute(
+				QStringLiteral("missing_layer_policy"),
+				missingLayerPolicyToString(missing_layer_policy));
+			if (missing_layer_policy == MissingLayerPolicy::UseExisting
+				&& ! missing_layer_fallback.isEmpty())
+			{
+				root.setAttribute(
+					QStringLiteral("missing_layer_fallback"),
+					missing_layer_fallback);
+			}
+		}
 		for (const Layer& layer : layers)
 		{
 			QDomElement element =
@@ -568,6 +607,15 @@ namespace DrawingLayers
 	{
 		Set set;
 		if (element.isNull()) return set;
+
+		if (element.hasAttribute(QStringLiteral("missing_layer_policy")))
+		{
+			set.missing_layer_policy = missingLayerPolicyFromString(
+				element.attribute(QStringLiteral("missing_layer_policy")));
+			set.missing_layer_fallback =
+				element.attribute(QStringLiteral("missing_layer_fallback"))
+					.trimmed();
+		}
 
 		for (QDomElement e = element.firstChildElement(QStringLiteral("layer"));
 			 ! e.isNull();

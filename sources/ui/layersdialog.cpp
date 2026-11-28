@@ -18,7 +18,9 @@
 #include "layersdialog.h"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QColorDialog>
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFile>
 #include <QFileDialog>
@@ -32,6 +34,7 @@
 #include <QListWidget>
 #include <QMenu>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QTableWidget>
 #include <QToolButton>
 #include <QUndoStack>
@@ -1231,4 +1234,182 @@ void LayersDialog::loadStandardLayers()
 	{
 		m_project->undoStack()->push(new DrawingLayersCommand(m_project, set));
 	}
+}
+
+QString LayersDialog::resolveMissingLayer(
+	QETProject* project, const QString& layer_name, QWidget* parent)
+{
+	const QString clean = layer_name.trimmed();
+	if (! project || clean.isEmpty()) return QString();
+	if (project->drawingLayers().contains(clean)) return clean;
+
+	DrawingLayers::Set set = project->drawingLayers();
+
+	// Non-interactive mode (CLI / unit tests) never pops up modal dialogs
+	if (QET::QetMessageBox::isNonInteractive())
+	{
+		switch (set.missing_layer_policy)
+		{
+		case DrawingLayers::MissingLayerPolicy::UseExisting:
+			return set.missing_layer_fallback;
+		case DrawingLayers::MissingLayerPolicy::NoLayer: return QString();
+		case DrawingLayers::MissingLayerPolicy::AutoCreate:
+		case DrawingLayers::MissingLayerPolicy::Ask:
+		default:
+			if (DrawingLayers::ensureLayer(set, clean, true))
+				project->setDrawingLayers(set);
+			return clean;
+		}
+	}
+
+	switch (set.missing_layer_policy)
+	{
+	case DrawingLayers::MissingLayerPolicy::AutoCreate:
+		if (DrawingLayers::ensureLayer(set, clean, true))
+			project->setDrawingLayers(set);
+		return clean;
+	case DrawingLayers::MissingLayerPolicy::UseExisting:
+		return set.missing_layer_fallback;
+	case DrawingLayers::MissingLayerPolicy::NoLayer: return QString();
+	case DrawingLayers::MissingLayerPolicy::Ask: break;
+	}
+
+	QDialog dialog(parent ? parent : QApplication::activeWindow());
+	dialog.setWindowTitle(tr("Unknown layer"));
+	auto* vbox = new QVBoxLayout(&dialog);
+
+	auto* msg = new QLabel(
+		tr("The symbol uses layer \"%1\", which does not exist in this project yet.\n"
+		   "How would you like to proceed?")
+			.arg(clean),
+		&dialog);
+	msg->setWordWrap(true);
+	vbox->addWidget(msg);
+
+	auto* create_rb =
+		new QRadioButton(tr("Create new layer \"%1\"").arg(clean), &dialog);
+	create_rb->setChecked(true);
+	vbox->addWidget(create_rb);
+
+	auto* desc_row = new QHBoxLayout();
+	desc_row->setContentsMargins(24, 0, 0, 4);
+	auto* desc_label = new QLabel(tr("Description:"), &dialog);
+	auto* desc_edit	 = new QLineEdit(&dialog);
+	desc_edit->setPlaceholderText(tr("Optional (e.g. Klimatechnik)"));
+	desc_row->addWidget(desc_label);
+	desc_row->addWidget(desc_edit, 1);
+	vbox->addLayout(desc_row);
+
+	auto* existing_rb =
+		new QRadioButton(tr("Assign to existing layer:"), &dialog);
+	vbox->addWidget(existing_rb);
+
+	auto* existing_row = new QHBoxLayout();
+	existing_row->setContentsMargins(24, 0, 0, 4);
+	auto* existing_cb = new QComboBox(&dialog);
+	for (const auto& choice : DrawingLayers::availableLayerChoices(set))
+	{
+		const DrawingLayers::FixedKind fk =
+			DrawingLayers::fixedKindOf(choice.first);
+		if (fk == DrawingLayers::FixedKind::FrameAndTitleBlock
+			|| fk == DrawingLayers::FixedKind::WireNumbers
+			|| fk == DrawingLayers::FixedKind::SymbolTexts
+			|| fk == DrawingLayers::FixedKind::CrossReferences)
+		{
+			continue;
+		}
+		const QString label =
+			choice.second.isEmpty() ?
+				choice.first :
+				QStringLiteral("%1 - %2").arg(choice.first, choice.second);
+		existing_cb->addItem(label, choice.first);
+	}
+	existing_cb->setEnabled(false);
+	existing_row->addWidget(existing_cb, 1);
+	vbox->addLayout(existing_row);
+
+	auto* none_rb =
+		new QRadioButton(tr("Place without a layer (default)"), &dialog);
+	vbox->addWidget(none_rb);
+
+	QObject::connect(
+		create_rb,
+		&QRadioButton::toggled,
+		desc_edit,
+		&QWidget::setEnabled);
+	QObject::connect(
+		create_rb,
+		&QRadioButton::toggled,
+		desc_label,
+		&QWidget::setEnabled);
+	QObject::connect(
+		existing_rb,
+		&QRadioButton::toggled,
+		existing_cb,
+		&QWidget::setEnabled);
+
+	vbox->addSpacing(6);
+	auto* remember_cb = new QCheckBox(
+		tr("Use this choice as default for further unknown layers in this "
+		   "project (do not ask again)"),
+		&dialog);
+	remember_cb->setToolTip(
+		tr("You can re-enable this prompt anytime in Project > Properties."));
+	vbox->addWidget(remember_cb);
+
+	auto* buttons = new QDialogButtonBox(
+		QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
+		&dialog);
+	QObject::connect(
+		buttons,
+		&QDialogButtonBox::accepted,
+		&dialog,
+		&QDialog::accept);
+	QObject::connect(
+		buttons,
+		&QDialogButtonBox::rejected,
+		&dialog,
+		&QDialog::reject);
+	vbox->addWidget(buttons);
+
+	if (dialog.exec() != QDialog::Accepted) return QString();
+
+	QString resolved;
+	if (create_rb->isChecked())
+	{
+		const QString desc = desc_edit->text().trimmed();
+		set.layers.append(
+			{clean, desc, true, true, false, DrawingLayers::FixedKind::None});
+		if (remember_cb->isChecked())
+		{
+			set.missing_layer_policy =
+				DrawingLayers::MissingLayerPolicy::AutoCreate;
+			set.missing_layer_fallback.clear();
+		}
+		project->setDrawingLayers(set);
+		resolved = clean;
+	}
+	else if (existing_rb->isChecked())
+	{
+		resolved = existing_cb->currentData().toString();
+		if (remember_cb->isChecked())
+		{
+			set.missing_layer_policy =
+				DrawingLayers::MissingLayerPolicy::UseExisting;
+			set.missing_layer_fallback = resolved;
+			project->setDrawingLayers(set);
+		}
+	}
+	else
+	{
+		resolved = QString();
+		if (remember_cb->isChecked())
+		{
+			set.missing_layer_policy =
+				DrawingLayers::MissingLayerPolicy::NoLayer;
+			set.missing_layer_fallback.clear();
+			project->setDrawingLayers(set);
+		}
+	}
+	return resolved;
 }

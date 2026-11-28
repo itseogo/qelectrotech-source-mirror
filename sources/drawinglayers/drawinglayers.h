@@ -122,11 +122,24 @@ namespace DrawingLayers
 		{ return name == o.name && layers == o.layers; }
 	};
 
+	enum class MissingLayerPolicy
+	{
+		Ask = 0,
+		AutoCreate = 1,
+		UseExisting = 2,
+		NoLayer = 3
+	};
+
+	QString			   missingLayerPolicyToString(MissingLayerPolicy policy);
+	MissingLayerPolicy missingLayerPolicyFromString(const QString& value);
+
 	struct Set
 	{
 		Set();
-		QList<Layer> layers;
-		QList<Group> groups;
+		QList<Layer>	   layers;
+		QList<Group>	   groups;
+		MissingLayerPolicy missing_layer_policy = MissingLayerPolicy::Ask;
+		QString			   missing_layer_fallback;
 
 		void		 ensureFixedLayers();
 		QList<Layer> userLayers() const;
@@ -134,7 +147,11 @@ namespace DrawingLayers
 
 		bool isEmpty() const;
 		bool operator==(const Set& o) const
-		{ return layers == o.layers && groups == o.groups; }
+		{
+			return layers == o.layers && groups == o.groups
+				   && missing_layer_policy == o.missing_layer_policy
+				   && missing_layer_fallback == o.missing_layer_fallback;
+		}
 		bool		operator!=(const Set& o) const { return ! (*this == o); }
 		bool		contains(const QString& name) const;
 		bool		isVisible(const QString& name) const;

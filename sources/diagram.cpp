@@ -55,6 +55,7 @@
 #include "qetgraphicsitem/structureboxitem.h"
 #include "qetgraphicsitem/terminal.h"
 #include "qetxml.h"
+#include "ui/layersdialog.h"
 #include "undocommand/addelementtextcommand.h"
 #include "qetinformation.h"
 #include "qetproject.h"
@@ -3067,9 +3068,16 @@ void Diagram::addItem(QGraphicsItem *item)
 				const QString el_layer = DrawingLayers::layerOf(elmt);
 				if (!el_layer.isEmpty()) {
 					if (!m_project->drawingLayers().contains(el_layer)) {
-						DrawingLayers::Set set = m_project->drawingLayers();
-						if (DrawingLayers::ensureLayer(set, el_layer, true)) {
-							m_project->setDrawingLayers(set);
+						if (reading || m_project->state() == QETProject::ProjectParsingRunning) {
+							DrawingLayers::Set set = m_project->drawingLayers();
+							if (DrawingLayers::ensureLayer(set, el_layer, true)) {
+								m_project->setDrawingLayers(set);
+							}
+						} else {
+							const QString resolved = LayersDialog::resolveMissingLayer(m_project, el_layer);
+							if (resolved != el_layer) {
+								DrawingLayers::setLayerOf(elmt, resolved);
+							}
 						}
 					}
 					DrawingLayers::apply(elmt, m_project->drawingLayers());
