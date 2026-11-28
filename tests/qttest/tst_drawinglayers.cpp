@@ -1059,6 +1059,23 @@ class tst_drawinglayers : public QObject
 			QVERIFY(el_project.drawingLayers().contains(QStringLiteral("EDV")));
 			QVERIFY(sym->isVisible());
 
+			// DXF export puts the symbol on its assigned DrawingLayer ("EDV")
+			// and declares all 8 fixed layers + custom layers in the LAYER table
+			{
+				const QString sym_dxf_path =
+					m_dir.filePath(QStringLiteral("symbol_layers.dxf"));
+				ExportProperties dxf_props;
+				dxf_props.dxf_blocks = true;
+				dxf_props.dxf_attributes = false;
+				DxfExport::write(el_folio, 1000, 1000, sym_dxf_path, dxf_props);
+				QFile f(sym_dxf_path);
+				QVERIFY(f.open(QIODevice::ReadOnly));
+				const QString dxf = QString::fromUtf8(f.readAll());
+				QVERIFY(dxf.contains(QStringLiteral("70 - Installation symbols")));
+				QVERIFY(dxf.contains(QStringLiteral("80 - Building")));
+				QVERIFY(dxf.contains(QStringLiteral("INSERT\r\n8\r\nEDV\r\n")));
+			}
+
 			// Hide and lock the EDV layer
 			DrawingLayers::Set edv_set = el_project.drawingLayers();
 			for (auto& l : edv_set.layers)

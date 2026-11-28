@@ -61,7 +61,9 @@ namespace {
 	void drawSymbol(const QString &file_path, Element *elmt,
 					qreal elem_pos_x, qreal elem_pos_y,
 					double rotation_angle, bool draw_terminals,
-					bool as_placed = false)
+					bool as_placed = false,
+					const QString &symbol_layer = DxfExport::Layer::Symbols,
+					const QString &text_layer = DxfExport::Layer::SymbolTexts)
 	{
 		using namespace DxfExport;
 			//The mirrors of an element are about its own axes, before it is
@@ -78,7 +80,7 @@ namespace {
 		const qreal mirror_y = mirror_v ? -1 : 1;
 		ElementPictureFactory::primitives primitives = ElementPictureFactory::instance()->getPrimitives(elmt->location());
 
-		Createdxf::layer = Layer::SymbolTexts;
+		Createdxf::layer = text_layer;
 		for(QGraphicsSimpleTextItem *text : primitives.m_texts)
 		{
 			qreal fontSize = text->font().pointSizeF();
@@ -127,7 +129,7 @@ namespace {
 			}
 		}
 
-		Createdxf::layer = Layer::Symbols;
+		Createdxf::layer = symbol_layer;
 		for (QLineF line : primitives.m_lines)
 		{
 			QTransform t = QTransform().translate(elem_pos_x,elem_pos_y).rotate(rotation_angle).scale(mirror_x, mirror_y);
@@ -189,7 +191,9 @@ namespace {
 			Createdxf::drawArcEllipse(file_path, r, startAngle, spanAngle, hotspot, rotation_angle, 0);
 		}
 		if (draw_terminals) {
-			Createdxf::layer = Layer::Terminals;
+			Createdxf::layer = (symbol_layer == QLatin1String("0"))
+				? QStringLiteral("0")
+				: (symbol_layer != Layer::Symbols ? symbol_layer : Layer::Terminals);
 			// Draw terminals
 			QList<Terminal *> list_terminals = elmt->terminals();
 			QColor col("red");
@@ -632,9 +636,12 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 
 		// Prepare all DXF layer definitions (project drawing layers + fallback standard layers)
 	QList<Createdxf::LayerDef> dxf_layer_defs;
+	QSet<QString> seen_dxf_layers;
 	for (const auto &l : dlayers.layers) {
 		Createdxf::LayerDef def;
 		def.name = DrawingLayers::dxfLayerName(l);
+		if (seen_dxf_layers.contains(def.name)) continue;
+		seen_dxf_layers.insert(def.name);
 		int col = l.color.isValid() ? Createdxf::dxfColor(l.color) : 7;
 		if (col == 0) col = 7;
 		if (!l.visible) col = -std::abs(col);
@@ -643,18 +650,23 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 		dxf_layer_defs.append(def);
 	}
 	for (const QString &fixed_layer : Layer::all()) {
+		if (seen_dxf_layers.contains(fixed_layer)) continue;
+		seen_dxf_layers.insert(fixed_layer);
 		dxf_layer_defs.append({fixed_layer, 7, 0});
 	}
 
 		//A block is drawn as if its symbol sat unturned at the folio's
 		//origin, which is DXF (0, sheetHeight); that is its base point.
+		//Entities inside a BLOCK are written on layer "0" so that each
+		//INSERT inherits its own DrawingLayer in every DXF viewer.
 	Createdxf::dxfBegin(file_path, dxf_layer_defs, [&]() {
 		for (Element *model : std::as_const(block_models)) {
 			const QString block = block_names.value(model -> location().toString());
 			const QList<Createdxf::Attribute> definitions = attribute_definitions.value(block);
 			Createdxf::dxfBlockBegin(file_path, block, 0, Createdxf::sheetHeight,
 									 !definitions.isEmpty());
-			drawSymbol(file_path, model, 0, 0, 0, properties.draw_terminals);
+			drawSymbol(file_path, model, 0, 0, 0, properties.draw_terminals,
+					   false, QStringLiteral("0"), QStringLiteral("0"));
 			for (const Createdxf::Attribute &definition : definitions)
 				Createdxf::drawAttdef(file_path, definition);
 			Createdxf::dxfBlockEnd(file_path);
@@ -699,13 +711,18 @@ void DxfExport::write(Diagram *diagram, int width, int height,
 		const double rotation_angle = elmt -> orientation() * 90;
 		const qreal elem_pos_x = elmt -> pos().x();
 		const qreal elem_pos_y = elmt -> pos().y();
+		const QString elmt_layer = dxfLayerForItem(elmt, QString(), Layer::Symbols);
+		const QString elmt_text_layer = DrawingLayers::layerOf(elmt).isEmpty()
+			? dxfLayerForKind(DrawingLayers::FixedKind::SymbolTexts, Layer::SymbolTexts)
+			: elmt_layer;
 
 		const QString block = blockOf(elmt);
 		if (block.isEmpty()) {
 			drawSymbol(file_path, elmt, elem_pos_x, elem_pos_y,
-					   rotation_angle, properties.draw_terminals, true);
+					   rotation_angle, properties.draw_terminals, true,
+					   elmt_layer, elmt_text_layer);
 		} else {
-			Createdxf::layer = Layer::Symbols;
+			Createdxf::layer = elmt_layer;
 				//QElectroTech turns a symbol clockwise, DXF counter-clockwise
 			Createdxf::drawInsert(file_path, block,
 								  elem_pos_x * Createdxf::xScale,
