@@ -53,7 +53,9 @@ namespace DrawingLayers
 		SymbolTexts,
 		CrossReferences,
 		Graphics,
-		Pictures
+		Pictures,
+		InstallationSymbols,
+		Building
 	};
 
 	QString	  fixedKindName(FixedKind kind);

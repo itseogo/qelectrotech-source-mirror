@@ -524,7 +524,14 @@ void LayersDialog::updateButtonStates()
 										   DrawingLayers::FixedKind::Graphics)
 								|| current
 									   == DrawingLayers::fixedKindName(
-										   DrawingLayers::FixedKind::Pictures));
+										   DrawingLayers::FixedKind::Pictures)
+								|| current
+									   == DrawingLayers::fixedKindName(
+										   DrawingLayers::FixedKind::
+											   InstallationSymbols)
+								|| current
+									   == DrawingLayers::fixedKindName(
+										   DrawingLayers::FixedKind::Building));
 
 	if (m_rename_btn) m_rename_btn->setEnabled(has_selection && ! fixed);
 	if (m_remove_btn) m_remove_btn->setEnabled(has_selection && ! fixed);
@@ -1057,7 +1064,14 @@ int LayersDialog::putSelectionOnLayer(const QString& layer, Diagram* folio)
 									 DrawingLayers::FixedKind::Graphics)
 						  && layer
 								 != DrawingLayers::fixedKindName(
-									 DrawingLayers::FixedKind::Pictures);
+									 DrawingLayers::FixedKind::Pictures)
+						  && layer
+								 != DrawingLayers::fixedKindName(
+									 DrawingLayers::FixedKind::
+										 InstallationSymbols)
+						  && layer
+								 != DrawingLayers::fixedKindName(
+									 DrawingLayers::FixedKind::Building);
 	if (! m_project || is_fixed) return 0;
 	if (! folio)
 	{

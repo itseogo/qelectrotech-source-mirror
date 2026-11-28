@@ -133,6 +133,8 @@ namespace DrawingLayers
 		case FixedKind::CrossReferences: return QStringLiteral("40");
 		case FixedKind::Graphics: return QStringLiteral("50");
 		case FixedKind::Pictures: return QStringLiteral("60");
+		case FixedKind::InstallationSymbols: return QStringLiteral("70");
+		case FixedKind::Building: return QStringLiteral("80");
 		default: return QString();
 		}
 	}
@@ -148,6 +150,9 @@ namespace DrawingLayers
 		case FixedKind::CrossReferences: return QObject::tr("Cross-references");
 		case FixedKind::Graphics: return QObject::tr("Graphics");
 		case FixedKind::Pictures: return QObject::tr("Pictures");
+		case FixedKind::InstallationSymbols:
+			return QObject::tr("Installation symbols");
+		case FixedKind::Building: return QObject::tr("Building");
 		default: return QString();
 		}
 	}
@@ -164,6 +169,9 @@ namespace DrawingLayers
 			return QStringLiteral("cross_references");
 		case FixedKind::Graphics: return QStringLiteral("graphics");
 		case FixedKind::Pictures: return QStringLiteral("pictures");
+		case FixedKind::InstallationSymbols:
+			return QStringLiteral("installation_symbols");
+		case FixedKind::Building: return QStringLiteral("building");
 		default: return QString();
 		}
 	}
@@ -181,6 +189,10 @@ namespace DrawingLayers
 		if (attr == QLatin1String("graphics")) return FixedKind::Graphics;
 		if (attr == QLatin1String("pictures") || attr == QLatin1String("images"))
 			return FixedKind::Pictures;
+		if (attr == QLatin1String("installation_symbols"))
+			return FixedKind::InstallationSymbols;
+		if (attr == QLatin1String("building"))
+			return FixedKind::Building;
 		return FixedKind::None;
 	}
 
@@ -211,6 +223,15 @@ namespace DrawingLayers
 			|| name == QStringLiteral("Bilder")
 			|| name == fixedKindDisplayName(FixedKind::Pictures))
 			return FixedKind::Pictures;
+		if (name == QStringLiteral("70")
+			|| name == QStringLiteral("Installation symbols")
+			|| name == QStringLiteral("Installationssymbole")
+			|| name == fixedKindDisplayName(FixedKind::InstallationSymbols))
+			return FixedKind::InstallationSymbols;
+		if (name == QStringLiteral("80") || name == QStringLiteral("Building")
+			|| name == QStringLiteral("Gebäude")
+			|| name == fixedKindDisplayName(FixedKind::Building))
+			return FixedKind::Building;
 		return FixedKind::None;
 	}
 
@@ -255,7 +276,19 @@ namespace DrawingLayers
 			 true,
 			 true,
 			 false,
-			 FixedKind::Pictures}};
+			 FixedKind::Pictures},
+			{fixedKindName(FixedKind::InstallationSymbols),
+			 fixedKindDisplayName(FixedKind::InstallationSymbols),
+			 true,
+			 true,
+			 false,
+			 FixedKind::InstallationSymbols},
+			{fixedKindName(FixedKind::Building),
+			 fixedKindDisplayName(FixedKind::Building),
+			 true,
+			 true,
+			 false,
+			 FixedKind::Building}};
 	}
 
 	Set::Set() { ensureFixedLayers(); }
@@ -1157,6 +1190,8 @@ namespace DrawingLayers
 		without_bmk << fixedKindName(FixedKind::CrossReferences);
 		without_bmk << fixedKindName(FixedKind::Graphics);
 		without_bmk << fixedKindName(FixedKind::Pictures);
+		without_bmk << fixedKindName(FixedKind::InstallationSymbols);
+		without_bmk << fixedKindName(FixedKind::Building);
 		without_bmk << QStringLiteral("100") << QStringLiteral("101")
 					<< QStringLiteral("102") << QStringLiteral("107")
 					<< QStringLiteral("108") << QStringLiteral("109")

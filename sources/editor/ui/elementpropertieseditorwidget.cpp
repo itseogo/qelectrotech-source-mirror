@@ -19,7 +19,10 @@
 
 #include <qet.h>
 #include <qetapp.h>
+#include <qetdiagrameditor.h>
 #include <qetinformation.h>
+#include <qetproject.h>
+#include <drawinglayers/drawinglayers.h>
 #include <TerminalStrip/terminalcatalog.h>
 #include <TerminalStrip/terminalcolor.h>
 #include "qetgraphicsitem/terminal.h"
@@ -336,7 +339,12 @@ void ElementPropertiesEditorWidget::upDateInterface()
 
 	ui->m_exclude_from_bom_cb->setChecked(
 		QET::infoFlagIsTrue(m_data.m_informations.value(QStringLiteral("exclude_from_bom")).toString()));
-	ui->m_default_layer_cb->setCurrentText(m_data.m_default_layer);
+	const int layer_idx = ui->m_default_layer_cb->findData(m_data.m_default_layer);
+	if (layer_idx >= 0) {
+		ui->m_default_layer_cb->setCurrentIndex(layer_idx);
+	} else {
+		ui->m_default_layer_cb->setCurrentText(m_data.m_default_layer);
+	}
 
 	on_m_base_type_cb_currentIndexChanged(ui->m_base_type_cb->currentIndex());
 }
@@ -357,12 +365,49 @@ void ElementPropertiesEditorWidget::setUpInterface()
 	ui->m_base_type_cb->addItem (tr("Thumbnail"), ElementData::Thumbnail);
 	ui->m_base_type_cb->addItem (tr("Conductor definition"), ElementData::ConductorDefinition);
 
-		// Default layer combo box (optional, editable for custom layers like EDV / Elektroinstallation)
+		// Default layer combo box (optional, populated from open project(s) + standard layers, editable for new custom layers)
 	ui->m_default_layer_cb->setEditable(true);
 	ui->m_default_layer_cb->setInsertPolicy(QComboBox::NoInsert);
-	ui->m_default_layer_cb->addItem(QString());
+	ui->m_default_layer_cb->addItem(QString(), QString());
+
+	QSet<QString> seen_layers;
+	auto addLayerChoice = [this, &seen_layers](const QString &name, const QString &desc) {
+		if (name.isEmpty() || seen_layers.contains(name)) return;
+		const DrawingLayers::FixedKind fk = DrawingLayers::fixedKindOf(name);
+		if (fk == DrawingLayers::FixedKind::FrameAndTitleBlock ||
+			fk == DrawingLayers::FixedKind::WireNumbers ||
+			fk == DrawingLayers::FixedKind::SymbolTexts ||
+			fk == DrawingLayers::FixedKind::CrossReferences) {
+			return;
+		}
+		seen_layers.insert(name);
+		const QString display = desc.isEmpty()
+			? name
+			: QStringLiteral("%1 - %2").arg(name, desc);
+		ui->m_default_layer_cb->addItem(display, name);
+	};
+
+	// First collect layers from the currently active project, then other open projects
+	for (QETDiagramEditor *ed : QETApp::diagramEditors()) {
+		if (QETProject *proj = ed ? ed->currentProject() : nullptr) {
+			for (const auto &choice : DrawingLayers::availableLayerChoices(proj->drawingLayers())) {
+				addLayerChoice(choice.first, choice.second);
+			}
+		}
+	}
+	for (QETProject *proj : QETApp::registeredProjects().values()) {
+		if (!proj) continue;
+		for (const auto &choice : DrawingLayers::availableLayerChoices(proj->drawingLayers())) {
+			addLayerChoice(choice.first, choice.second);
+		}
+	}
+	// Always offer standard fixed layers (50 Graphics, 60 Pictures, 70 Installation symbols, 80 Building)
+	for (const DrawingLayers::Layer &fl : DrawingLayers::defaultFixedLayers()) {
+		addLayerChoice(fl.name, fl.description);
+	}
+
 	if (auto *le = ui->m_default_layer_cb->lineEdit()) {
-		le->setPlaceholderText(tr("None (optional, e.g. EDV, Elektroinstallation)"));
+		le->setPlaceholderText(tr("None (optional, e.g. 70, 80, EDV)"));
 		le->setClearButtonEnabled(true);
 	}
 
@@ -970,7 +1015,13 @@ void ElementPropertiesEditorWidget::junctionRoleChanged(int row)
 void ElementPropertiesEditorWidget::on_m_buttonBox_accepted()
 {
 	m_data.m_type = ui->m_base_type_cb->currentData().value<ElementData::Type>();
-	m_data.m_default_layer = ui->m_default_layer_cb->currentText().trimmed();
+	const QString typed_layer = ui->m_default_layer_cb->currentText().trimmed();
+	const int matched_idx = ui->m_default_layer_cb->findText(typed_layer);
+	if (matched_idx >= 0) {
+		m_data.m_default_layer = ui->m_default_layer_cb->itemData(matched_idx).toString().trimmed();
+	} else {
+		m_data.m_default_layer = typed_layer;
+	}
 
 	if (m_data.m_type == ElementData::Slave)
 	{
